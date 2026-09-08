@@ -1,4 +1,4 @@
-# @applift/poke-server
+# @appliftlabs/poke-server
 
 Reference backend for [Poke](../README.md). Postgres-backed, with Server-Sent-
 Events realtime so pins appear live for everyone on the page.
@@ -29,7 +29,7 @@ Health check: `curl localhost:4000/health` → `{"ok":true,...}`.
 ## Point Poke at it
 
 ```js
-import { init, HttpAdapter } from "@applift/poke";
+import { init, HttpAdapter } from "@appliftlabs/poke";
 
 init({
   // pass `user` if your app has accounts; omit for the name prompt

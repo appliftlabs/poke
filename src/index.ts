@@ -1,5 +1,5 @@
 /**
- * @applift/poke — Figma-style pinned comments for any live web page.
+ * @appliftlabs/poke — Figma-style pinned comments for any live web page.
  */
 export { init, type PokeConfig, type PokeInstance } from "./poke.js";
 

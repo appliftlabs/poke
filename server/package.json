@@ -1,5 +1,5 @@
 {
-  "name": "@applift/poke-server",
+  "name": "@appliftlabs/poke-server",
   "version": "0.1.0",
   "private": true,
   "description": "Reference backend for Poke — Postgres-backed, with SSE realtime.",

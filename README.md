@@ -40,11 +40,11 @@ Next: keyboard nav, screenshots attached to comments.
 ## Quick start
 
 ```bash
-npm install @applift/poke
+npm install @appliftlabs/poke
 ```
 
 ```js
-import { init } from "@applift/poke";
+import { init } from "@appliftlabs/poke";
 
 // App with accounts — tell Poke who's here:
 init({ user: { id: currentUser.id, name: currentUser.name } });
@@ -78,7 +78,7 @@ Or the script tag, no build step at all:
 
 ```html
 <script
-  src="https://unpkg.com/@applift/poke/dist/poke.global.js"
+  src="https://unpkg.com/@appliftlabs/poke/dist/poke.global.js"
   data-poke-user-id="u_12"
   data-poke-user-name="Ada Lovelace"
 ></script>
@@ -89,7 +89,7 @@ Or the script tag, no build step at all:
 Use `HttpAdapter` against a backend that speaks Poke's small REST contract:
 
 ```ts
-import { init, HttpAdapter } from "@applift/poke";
+import { init, HttpAdapter } from "@appliftlabs/poke";
 
 init({
   user: { id: me.id, name: me.name },
@@ -129,7 +129,7 @@ The REST contract it implements:
 Implement the six methods (all may be async) plus an optional `subscribe()`:
 
 ```ts
-import type { StorageAdapter } from "@applift/poke";
+import type { StorageAdapter } from "@appliftlabs/poke";
 
 class FirebaseAdapter implements StorageAdapter {
   listThreads(pageId) { /* query */ }
@@ -170,7 +170,7 @@ strategy can go stale — a class rename, a regenerated `id`, a new wrapper `div
 and the pin still lands, because the others corroborate.
 
 ```ts
-import { captureAnchor, resolveAnchor, anchorPoint } from "@applift/poke";
+import { captureAnchor, resolveAnchor, anchorPoint } from "@appliftlabs/poke";
 
 // When the user clicks to leave a comment:
 const anchor = captureAnchor(clickedElement, { clientX, clientY });

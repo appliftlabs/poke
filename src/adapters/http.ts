@@ -3,9 +3,9 @@
  *
  * This is the adapter to reach for when you want comments in a real database,
  * shared across users and devices. It expects a small JSON API (see the route
- * table below); a reference implementation lives in `examples/server/`.
+ * table below); a Postgres reference implementation lives in `server/`.
  *
- *   import { init, HttpAdapter } from "@applift/poke";
+ *   import { init, HttpAdapter } from "@appliftlabs/poke";
  *
  *   init({
  *     user: { id: me.id, name: me.name },
@@ -17,11 +17,11 @@
  *
  * Expected API (all JSON):
  *   GET    {baseUrl}/pages/:pageId/threads      -> PokeThread[]
- *   POST   {baseUrl}/threads                    body: PokeThread        -> 201
- *   POST   {baseUrl}/threads/:id/messages       body: { body: string }  -> PokeMessage
- *   PATCH  {baseUrl}/threads/:id                body: { status? }       -> 200
- *   PATCH  {baseUrl}/messages/:id               body: { body: string }  -> 200
- *   DELETE {baseUrl}/threads/:id                                        -> 204
+ *   POST   {baseUrl}/threads                    body: PokeThread                 -> 201
+ *   POST   {baseUrl}/threads/:id/messages       body: { body, author }           -> PokeMessage
+ *   PATCH  {baseUrl}/threads/:id                body: { status }                 -> 200
+ *   PATCH  {baseUrl}/messages/:id               body: { body }                   -> 200
+ *   DELETE {baseUrl}/threads/:id                                                 -> 204
  *
  * Realtime is optional. If you pass `sseUrl` (or the backend exposes
  * `{baseUrl}/pages/:pageId/events`), the adapter opens an EventSource and

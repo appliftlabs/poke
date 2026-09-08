@@ -1,7 +1,7 @@
 /**
  * The public entry point: `Poke.init(...)`.
  *
- *   import { init } from "@applift/poke";
+ *   import { init } from "@appliftlabs/poke";
  *
  *   // App with real accounts — pass the user:
  *   init({ user: { id: "u_12", name: "Ada Lovelace" } });
