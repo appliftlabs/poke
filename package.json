@@ -1,0 +1,51 @@
+{
+  "name": "@applift/poke",
+  "version": "0.0.0",
+  "description": "Figma-style pinned comments for any live web page. Drop-in, element-anchored, open source.",
+  "license": "MIT",
+  "author": "Applift Labs",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/appliftlabs/poke"
+  },
+  "keywords": [
+    "comments",
+    "annotations",
+    "feedback",
+    "bug-reporting",
+    "review",
+    "figma-style"
+  ],
+  "type": "module",
+  "main": "./dist/index.cjs",
+  "module": "./dist/index.js",
+  "types": "./dist/index.d.ts",
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "import": "./dist/index.js",
+      "require": "./dist/index.cjs"
+    }
+  },
+  "files": [
+    "dist"
+  ],
+  "scripts": {
+    "build": "tsup",
+    "dev": "tsup --watch",
+    "test": "vitest run",
+    "test:watch": "vitest",
+    "typecheck": "tsc --noEmit",
+    "lint": "eslint src"
+  },
+  "devDependencies": {
+    "@types/node": "^22.10.2",
+    "jsdom": "^25.0.1",
+    "tsup": "^8.3.5",
+    "typescript": "^5.7.2",
+    "vitest": "^2.1.8"
+  },
+  "dependencies": {
+    "preact": "^10.25.3"
+  }
+}

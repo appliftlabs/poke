@@ -1,0 +1,219 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Poke — anchoring engine playground</title>
+    <style>
+      :root {
+        color-scheme: light dark;
+        font-family: ui-sans-serif, system-ui, -apple-system, sans-serif;
+      }
+      body {
+        margin: 0;
+        display: grid;
+        grid-template-columns: 1fr 340px;
+        min-height: 100vh;
+      }
+      main {
+        padding: 32px 40px;
+        border-right: 1px solid color-mix(in srgb, currentColor 15%, transparent);
+      }
+      aside {
+        padding: 24px;
+        background: color-mix(in srgb, currentColor 4%, transparent);
+        font-size: 13px;
+      }
+      h1 {
+        font-size: 18px;
+      }
+      .card {
+        border: 1px solid color-mix(in srgb, currentColor 15%, transparent);
+        border-radius: 10px;
+        padding: 16px;
+        margin: 12px 0;
+      }
+      button {
+        font: inherit;
+        padding: 8px 14px;
+        border-radius: 8px;
+        border: 1px solid color-mix(in srgb, currentColor 25%, transparent);
+        background: transparent;
+        cursor: pointer;
+      }
+      .toolbar button {
+        background: #2563eb;
+        color: white;
+        border: none;
+      }
+      #pin-layer {
+        position: absolute;
+        inset: 0;
+        pointer-events: none;
+      }
+      .pin {
+        position: absolute;
+        width: 24px;
+        height: 24px;
+        border-radius: 50% 50% 50% 2px;
+        background: #f59e0b;
+        color: #1f2937;
+        display: grid;
+        place-items: center;
+        font-size: 12px;
+        font-weight: 700;
+        transform: translate(-2px, -24px);
+        box-shadow: 0 2px 8px rgba(0, 0, 0, 0.35);
+      }
+      .pin[data-confidence="low"],
+      .pin[data-confidence="medium"] {
+        background: #f87171;
+      }
+      .log {
+        white-space: pre-wrap;
+        font-family: ui-monospace, monospace;
+        font-size: 12px;
+        line-height: 1.5;
+      }
+      .muted {
+        opacity: 0.6;
+      }
+    </style>
+  </head>
+  <body>
+    <div id="pin-layer"></div>
+
+    <main>
+      <div class="toolbar">
+        <button id="toggle">Comment mode: OFF</button>
+        <button id="shuffle">Shuffle &amp; re-render the DOM</button>
+        <button id="reanchor">Re-anchor all pins</button>
+      </div>
+
+      <h1>A pretend product page</h1>
+      <p>
+        Turn on comment mode and click anything below to drop a pin. Then hit
+        <em>Shuffle</em> — it swaps class names, regenerates ids, reorders the
+        cards and wraps things in new divs, the way a real rebuild would. Hit
+        <em>Re-anchor</em> and watch the pins find their elements again.
+      </p>
+
+      <div id="grid">
+        <div class="card feature-card" data-testid="card-reports">
+          <h3>Reports</h3>
+          <p>Export usage as CSV or connect to your warehouse.</p>
+          <button data-testid="cta-reports">Open reports</button>
+        </div>
+        <div class="card feature-card" data-testid="card-billing">
+          <h3>Billing</h3>
+          <p>Simple, transparent pricing for teams of any size.</p>
+          <button data-testid="cta-billing">Manage plan</button>
+        </div>
+        <div class="card feature-card" data-testid="card-settings">
+          <h3>Settings</h3>
+          <p>Invite teammates and configure single sign-on.</p>
+          <button data-testid="cta-settings">Open settings</button>
+        </div>
+      </div>
+    </main>
+
+    <aside>
+      <strong>Event log</strong>
+      <div class="log" id="log"><span class="muted">Waiting…</span></div>
+    </aside>
+
+    <script type="module">
+      import {
+        captureAnchor,
+        resolveAnchor,
+        anchorPoint,
+      } from "../dist/index.js";
+
+      const layer = document.getElementById("pin-layer");
+      const logEl = document.getElementById("log");
+      let commentMode = false;
+      let pins = []; // { id, anchor, comment }
+      let counter = 0;
+
+      const log = (msg) => {
+        logEl.textContent = `${msg}\n${logEl.textContent}`.slice(0, 4000);
+      };
+
+      document.getElementById("toggle").addEventListener("click", (e) => {
+        commentMode = !commentMode;
+        e.target.textContent = `Comment mode: ${commentMode ? "ON" : "OFF"}`;
+        document.body.style.cursor = commentMode ? "crosshair" : "";
+      });
+
+      document.addEventListener(
+        "click",
+        (e) => {
+          if (!commentMode) return;
+          if (e.target.closest(".toolbar") || e.target.closest("aside")) return;
+          e.preventDefault();
+          e.stopPropagation();
+
+          const el = e.target;
+          const anchor = captureAnchor(el, {
+            clientX: e.clientX,
+            clientY: e.clientY,
+          });
+          const comment = prompt("Leave a note on this element:");
+          if (!comment) return;
+
+          const id = ++counter;
+          pins.push({ id, anchor, comment });
+          log(`#${id} captured on <${anchor.tag}> — selector: ${anchor.selector}`);
+          render();
+        },
+        true,
+      );
+
+      document.getElementById("shuffle").addEventListener("click", () => {
+        const grid = document.getElementById("grid");
+        // Reorder
+        const cards = [...grid.children];
+        grid.append(...cards.sort(() => Math.random() - 0.5));
+        // Churn classes + ids, wrap buttons
+        for (const card of grid.children) {
+          card.className = `panel panel--${Math.random().toString(36).slice(2, 7)}`;
+          card.id = `:r${Math.random().toString(36).slice(2, 6)}:`;
+          const btn = card.querySelector("button");
+          if (btn && !btn.parentElement.classList.contains("btn-wrap")) {
+            const w = document.createElement("span");
+            w.className = "btn-wrap";
+            btn.replaceWith(w);
+            w.appendChild(btn);
+          }
+        }
+        log("DOM shuffled: reordered, reclassed, ids regenerated, buttons wrapped.");
+      });
+
+      document.getElementById("reanchor").addEventListener("click", render);
+
+      function render() {
+        layer.innerHTML = "";
+        for (const { id, anchor, comment } of pins) {
+          const { element, confidence, score, strategy } = resolveAnchor(anchor);
+          if (!element) {
+            log(`#${id} LOST (score ${score}) — "${comment}"`);
+            continue;
+          }
+          const { x, y } = anchorPoint(element, anchor);
+          const pin = document.createElement("div");
+          pin.className = "pin";
+          pin.dataset.confidence = confidence;
+          pin.textContent = id;
+          pin.style.left = `${x}px`;
+          pin.style.top = `${y}px`;
+          pin.title = `"${comment}"\nconfidence: ${confidence} (${score}) via ${strategy}`;
+          layer.appendChild(pin);
+          log(`#${id} → ${confidence} (${score}) via ${strategy}`);
+        }
+      }
+
+      window.addEventListener("resize", render);
+      window.addEventListener("scroll", render, { passive: true });
+    </script>
+  </body>
+</html>
