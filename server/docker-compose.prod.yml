@@ -1,0 +1,38 @@
+# Self-host: the server + its own Postgres, on any Docker host.
+#   POKE_ORIGINS=https://app.modools.co docker compose -f docker-compose.prod.yml up -d
+#
+# Put a TLS-terminating reverse proxy (Caddy, nginx, Traefik) in front of :4000.
+# For the SSE endpoint, disable proxy buffering on /pages/*/events.
+services:
+  poke-server:
+    build: .
+    restart: unless-stopped
+    ports:
+      - "4000:4000"
+    environment:
+      DATABASE_URL: postgres://poke:${POSTGRES_PASSWORD:-poke}@db:5432/poke
+      PORT: 4000
+      POKE_ORIGINS: ${POKE_ORIGINS:?set POKE_ORIGINS to your app origin(s)}
+      POKE_PROJECT: ${POKE_PROJECT:-default}
+      PGSSL: "0"
+    depends_on:
+      db:
+        condition: service_healthy
+
+  db:
+    image: postgres:16-alpine
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: poke
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-poke}
+      POSTGRES_DB: poke
+    volumes:
+      - poke-pgdata:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U poke"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+
+volumes:
+  poke-pgdata:

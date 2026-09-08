@@ -53,17 +53,59 @@ reloads on any change.
 
 ## Deploying
 
-Any Node host with a Postgres add-on works — Railway, Fly.io, Render, a VPS.
+The server needs a public URL your app can reach. `Dockerfile`, `railway.json`,
+and `docker-compose.prod.yml` are included.
 
-1. Provision Postgres, set `DATABASE_URL`.
-2. Set `POKE_ORIGINS` to your app's real origin(s), e.g.
-   `https://app.example.com,https://staging.example.com`.
-3. `npm run migrate` once (or let the server's boot-time `ensureSchema` handle
-   it — it's idempotent).
-4. `npm start`.
+### Railway
 
-Behind a proxy, make sure it doesn't buffer `text/event-stream` (nginx:
-`proxy_buffering off` for the events path).
+```bash
+npm i -g @railway/cli
+railway login
+
+cd server
+railway init                       # create a project
+railway add --database postgres    # provisions Postgres, injects DATABASE_URL
+railway variables --set POKE_ORIGINS=https://your-app.com --set POKE_PROJECT=modools
+railway up                         # builds the Dockerfile, deploys
+railway domain                     # get the public URL
+```
+
+`railway.json` sets the health check to `/health`. `DATABASE_URL` comes from the
+Postgres plugin automatically; you only set `POKE_ORIGINS` (and optionally
+`POKE_PROJECT`).
+
+### Fly.io
+
+```bash
+cd server
+fly launch --no-deploy             # generates fly.toml from the Dockerfile
+fly postgres create                # then: fly postgres attach <name>
+fly secrets set POKE_ORIGINS=https://your-app.com POKE_PROJECT=modools
+fly deploy
+```
+
+### Self-host (Docker)
+
+```bash
+POKE_ORIGINS=https://your-app.com POSTGRES_PASSWORD=$(openssl rand -hex 16) \
+  docker compose -f docker-compose.prod.yml up -d
+```
+
+Runs the server + its own Postgres. Put a TLS proxy (Caddy / nginx / Traefik) in
+front of `:4000`.
+
+### Any host — the essentials
+
+1. Provision Postgres, set `DATABASE_URL` (managed Postgres needs SSL — the
+   server auto-enables it for non-localhost hosts).
+2. Set `POKE_ORIGINS` to your app's exact origin(s), comma-separated:
+   `https://app.applift.xyz,https://staging.applift.xyz`.
+3. Deploy. The schema is created on boot (`ensureSchema`, idempotent); run
+   `npm run migrate` explicitly if you prefer.
+
+Behind a proxy, don't buffer `text/event-stream` — the SSE stream at
+`/pages/:pageId/events` needs to flush immediately (nginx: `proxy_buffering off`
+for that path; Caddy does the right thing by default).
 
 ## No auth — what that means
 

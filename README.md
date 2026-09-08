@@ -10,7 +10,7 @@ website.
 No more "the button, you know, the blue one, near the top" or screenshots with
 arrows scribbled on them. The note sits on the element.
 
-Poke is an open-source contribution from [Applift Labs](https://appliftlabs.com).
+Poke is an open-source contribution from [Applift Labs](https://applift.xyz).
 It's the clean, developer-friendly, no-strings version of what paid tools like
 BugHerd and Marker.io do. MIT licensed, free for any team.
 
