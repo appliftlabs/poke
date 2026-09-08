@@ -14,6 +14,7 @@ export type {
 } from "./core/types.js";
 
 export { LocalStorageAdapter } from "./adapters/local-storage.js";
+export { HttpAdapter, type HttpAdapterOptions } from "./adapters/http.js";
 export type {
   StorageAdapter,
   AddMessageInput,

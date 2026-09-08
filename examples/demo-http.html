@@ -1,0 +1,42 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Poke — DB-backed demo</title>
+    <style>
+      body { font-family: system-ui, sans-serif; margin: 0; background: #fafafa; }
+      header { background: #0f172a; color: #fff; padding: 40px; text-align: center; }
+      main { max-width: 800px; margin: 32px auto; padding: 0 24px; }
+      .card { background: #fff; border: 1px solid #e5e7eb; border-radius: 12px; padding: 24px; margin: 16px 0; }
+      button.demo { padding: 10px 16px; border: none; border-radius: 8px; background: #2563eb; color: #fff; font: inherit; }
+    </style>
+    <script type="importmap">
+      {
+        "imports": {
+          "preact": "https://esm.sh/preact@10.25.3",
+          "preact/hooks": "https://esm.sh/preact@10.25.3/hooks",
+          "preact/jsx-runtime": "https://esm.sh/preact@10.25.3/jsx-runtime"
+        }
+      }
+    </script>
+  </head>
+  <body>
+    <header><h1 data-testid="title">DB-backed Poke</h1></header>
+    <main>
+      <div class="card">
+        <h2 data-testid="section">Comments persist to SQLite via the reference server</h2>
+        <p>Leave a comment, resolve it, reload — it's still here, and it's in poke.db.</p>
+        <button class="demo" data-testid="cta">A button to pin</button>
+      </div>
+    </main>
+    <script type="module">
+      import { init, HttpAdapter } from "../dist/index.js";
+      init({
+        user: { id: "http-demo", name: "HTTP Demo", color: "#0891b2" },
+        pageId: "http-demo-page",
+        adapter: new HttpAdapter({ baseUrl: "http://localhost:4000" }),
+      });
+    </script>
+  </body>
+</html>

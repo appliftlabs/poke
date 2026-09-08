@@ -26,12 +26,14 @@ Early but usable. Working today:
   with a hover highlight, click-to-pin, threaded replies, resolve/reopen,
   delete, and a sidebar listing every comment. Rendered with Preact inside a
   Shadow DOM so it can't collide with the host page's styles or scripts.
-- **Storage** — storage-agnostic core with a bundled `LocalStorageAdapter`
-  (zero infra, syncs across tabs of the same origin). Bring your own backend by
-  implementing the `StorageAdapter` interface.
+- **Storage** — storage-agnostic core with two bundled adapters:
+  `LocalStorageAdapter` (zero infra, syncs across tabs) and `HttpAdapter`
+  (persists to any REST backend, with optional SSE realtime). A ~200-line
+  reference server (`examples/server/`, Node + built-in SQLite) implements the
+  contract. Or implement `StorageAdapter` against Firebase, Supabase, your own
+  API — whatever you already run.
 
-Next: richer adapters (REST reference, Firebase), keyboard nav, screenshots
-attached to comments.
+Next: keyboard nav, screenshots attached to comments.
 
 ## Quick start
 
@@ -56,22 +58,61 @@ Or the script tag, no build step:
 ></script>
 ```
 
-### Writing an adapter
+### Persisting to a database
+
+Use `HttpAdapter` against a backend that speaks Poke's small REST contract:
+
+```ts
+import { init, HttpAdapter } from "@applift/poke";
+
+init({
+  user: { id: me.id, name: me.name },
+  adapter: new HttpAdapter({
+    baseUrl: "https://api.example.com/poke",
+    headers: () => ({ Authorization: `Bearer ${getToken()}` }),
+    // realtime is automatic if the backend exposes an SSE stream at
+    // {baseUrl}/pages/:pageId/events — pass `sseUrl: null` to opt out
+  }),
+});
+```
+
+There's a complete reference backend in [`examples/server/`](examples/server/) —
+Node's built-in http server + built-in SQLite, no dependencies, ~200 lines:
+
+```bash
+node examples/server/server.mjs          # http://localhost:4000, writes poke.db
+```
+
+The REST contract it implements:
+
+| Method | Path | Body | Returns |
+|---|---|---|---|
+| `GET` | `/pages/:pageId/threads` | — | `PokeThread[]` |
+| `POST` | `/threads` | `PokeThread` | `201` |
+| `POST` | `/threads/:id/messages` | `{ body }` | `PokeMessage` |
+| `PATCH` | `/threads/:id` | `{ status? }` | `200` |
+| `PATCH` | `/messages/:id` | `{ body }` | `200` |
+| `DELETE` | `/threads/:id` | — | `204` |
+| `GET` | `/pages/:pageId/events` | — | SSE stream (optional) |
+
+### Writing a fully custom adapter
+
+Implement the six methods (all may be async) plus an optional `subscribe()`:
 
 ```ts
 import type { StorageAdapter } from "@applift/poke";
 
-class MyApiAdapter implements StorageAdapter {
-  listThreads(pageId) { return fetch(`/api/poke/${pageId}`).then(r => r.json()); }
-  createThread(thread) { return post("/api/poke", thread); }
-  addMessage({ threadId, body }) { return post(`/api/poke/${threadId}/messages`, { body }); }
-  updateThread(id, patch) { return patchReq(`/api/poke/${id}`, patch); }
-  updateMessage(id, body) { return patchReq(`/api/poke/messages/${id}`, { body }); }
-  deleteThread(id) { return del(`/api/poke/${id}`); }
-  // optional: subscribe(pageId, listener) — wire a WebSocket / SSE here for realtime
+class FirebaseAdapter implements StorageAdapter {
+  listThreads(pageId) { /* query */ }
+  createThread(thread) { /* write */ }
+  addMessage({ threadId, body }) { /* append, return the new PokeMessage */ }
+  updateThread(id, patch) { /* patch { status } */ }
+  updateMessage(id, body) { /* patch body */ }
+  deleteThread(id) { /* delete */ }
+  subscribe(pageId, listener) {
+    // call listener({ type: "reload" }) on any remote change; return unsub
+  }
 }
-
-init({ user, adapter: new MyApiAdapter() });
 ```
 
 ## The hard part: element anchoring
