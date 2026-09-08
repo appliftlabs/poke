@@ -37,18 +37,23 @@ Next: keyboard nav, screenshots attached to comments.
 
 ## Quick start
 
-```html
-<script type="module">
-  import { init } from "@applift/poke";
-
-  init({
-    user: { id: currentUser.id, name: currentUser.name },
-    // no adapter → uses localStorage. Pass `adapter` to sync your own backend.
-  });
-</script>
+```bash
+npm install @applift/poke
 ```
 
-Or the script tag, no build step:
+```js
+import { init } from "@applift/poke";
+
+init({
+  user: { id: currentUser.id, name: currentUser.name },
+  // no adapter → uses localStorage. Pass `adapter` to sync your own backend.
+});
+```
+
+Nothing else to install — Preact is bundled in, and Poke renders into its own
+Shadow DOM, so it won't touch your app's React/Preact/styles.
+
+Or the script tag, no build step at all:
 
 ```html
 <script
