@@ -75,8 +75,17 @@ function colorFromId(id: string): string {
 export interface LocalIdentityOptions {
   /** Provide a backend (tests). Defaults to localStorage, then in-memory. */
   backend?: IdentityBackend;
-  /** A name to seed with (e.g. from a previous session or a URL param). */
+  /**
+   * A name to use. Applied only if no name is already stored — so a first-time
+   * visitor is pre-filled but a returning one keeps the name they chose.
+   */
   initialName?: string;
+  /**
+   * A name that *overrides* whatever is stored. Use when the host explicitly
+   * tells Poke who this is on every load (e.g. `init({ user: { name } })`) —
+   * that's a deliberate signal, not just a default.
+   */
+  forceName?: string;
 }
 
 /**
@@ -104,16 +113,16 @@ export class LocalIdentity {
     const existing = this.backend.read();
     if (existing) {
       this.current = existing;
-      if (options.initialName && !existing.name) {
+      if (options.forceName && options.forceName.trim() !== existing.name) {
+        this.setName(options.forceName);
+      } else if (options.initialName && !existing.name) {
         this.setName(options.initialName);
       }
     } else {
       const id = newId("anon");
-      this.current = {
-        id,
-        color: colorFromId(id),
-        ...(options.initialName ? { name: options.initialName } : {}),
-      };
+      this.current = { id, color: colorFromId(id) };
+      const seed = options.forceName ?? options.initialName;
+      if (seed) this.current.name = seed.trim().slice(0, 60);
       this.backend.write(this.current);
     }
   }

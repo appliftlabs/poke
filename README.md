@@ -30,11 +30,10 @@ Early but usable. Working today:
   a name the first time someone comments and remembers it in that browser. The
   name shows next to their comments for everyone.
 - **Storage** — storage-agnostic core with two bundled adapters:
-  `LocalStorageAdapter` (zero infra, syncs across tabs) and `HttpAdapter`
-  (persists to any REST backend, with optional SSE realtime). A ~200-line
-  reference server (`examples/server/`, Node + built-in SQLite) implements the
-  contract. Or implement `StorageAdapter` against Firebase, Supabase, your own
-  API — whatever you already run.
+  `LocalStorageAdapter` (zero infra, single browser) and `HttpAdapter`
+  (persists to any REST backend, with SSE realtime for multi-user). A small
+  Postgres-backed reference server lives in [`server/`](server/). Or implement
+  `StorageAdapter` against Firebase, Supabase, your own API.
 
 Next: keyboard nav, screenshots attached to comments.
 
@@ -103,11 +102,14 @@ init({
 });
 ```
 
-There's a complete reference backend in [`examples/server/`](examples/server/) —
-Node's built-in http server + built-in SQLite, no dependencies, ~200 lines:
+There's a Postgres-backed reference backend in [`server/`](server/) with SSE
+realtime — deploy it as-is for a trusted audience, or fork it to add auth:
 
 ```bash
-node examples/server/server.mjs          # http://localhost:4000, writes poke.db
+cd server && npm install
+docker compose up -d                    # or bring your own Postgres
+DATABASE_URL=postgres://poke:poke@localhost:5432/poke npm run migrate
+node --env-file=.env src/server.js       # :4000
 ```
 
 The REST contract it implements:
@@ -116,8 +118,8 @@ The REST contract it implements:
 |---|---|---|---|
 | `GET` | `/pages/:pageId/threads` | — | `PokeThread[]` |
 | `POST` | `/threads` | `PokeThread` | `201` |
-| `POST` | `/threads/:id/messages` | `{ body }` | `PokeMessage` |
-| `PATCH` | `/threads/:id` | `{ status? }` | `200` |
+| `POST` | `/threads/:id/messages` | `{ body, author }` | `PokeMessage` |
+| `PATCH` | `/threads/:id` | `{ status }` | `200` |
 | `PATCH` | `/messages/:id` | `{ body }` | `200` |
 | `DELETE` | `/threads/:id` | — | `204` |
 | `GET` | `/pages/:pageId/events` | — | SSE stream (optional) |
@@ -132,7 +134,7 @@ import type { StorageAdapter } from "@applift/poke";
 class FirebaseAdapter implements StorageAdapter {
   listThreads(pageId) { /* query */ }
   createThread(thread) { /* write */ }
-  addMessage({ threadId, body }) { /* append, return the new PokeMessage */ }
+  addMessage({ threadId, body, author }) { /* append, return the new PokeMessage */ }
   updateThread(id, patch) { /* patch { status } */ }
   updateMessage(id, body) { /* patch body */ }
   deleteThread(id) { /* delete */ }

@@ -1,12 +1,16 @@
 {
   "name": "@applift/poke",
-  "version": "0.0.0",
+  "version": "0.1.0",
   "description": "Figma-style pinned comments for any live web page. Drop-in, element-anchored, open source.",
   "license": "MIT",
   "author": "Applift Labs",
+  "homepage": "https://github.com/appliftlabs/poke#readme",
   "repository": {
     "type": "git",
-    "url": "https://github.com/appliftlabs/poke"
+    "url": "git+https://github.com/appliftlabs/poke.git"
+  },
+  "bugs": {
+    "url": "https://github.com/appliftlabs/poke/issues"
   },
   "keywords": [
     "comments",
@@ -20,23 +24,40 @@
   "main": "./dist/index.cjs",
   "module": "./dist/index.js",
   "types": "./dist/index.d.ts",
+  "unpkg": "./dist/poke.global.js",
+  "jsdelivr": "./dist/poke.global.js",
+  "sideEffects": false,
   "exports": {
     ".": {
       "types": "./dist/index.d.ts",
       "import": "./dist/index.js",
       "require": "./dist/index.cjs"
-    }
+    },
+    "./global": "./dist/poke.global.js",
+    "./package.json": "./package.json"
   },
   "files": [
-    "dist"
+    "dist/*.js",
+    "dist/*.cjs",
+    "dist/*.d.ts",
+    "dist/*.d.cts",
+    "README.md",
+    "LICENSE"
   ],
+  "engines": {
+    "node": ">=18"
+  },
+  "publishConfig": {
+    "access": "public"
+  },
   "scripts": {
     "build": "tsup",
     "dev": "tsup --watch",
     "test": "vitest run",
     "test:watch": "vitest",
     "typecheck": "tsc --noEmit",
-    "lint": "eslint src"
+    "lint": "eslint src",
+    "prepublishOnly": "npm run typecheck && npm run test && npm run build"
   },
   "devDependencies": {
     "@types/node": "^22.10.2",

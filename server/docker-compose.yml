@@ -1,0 +1,22 @@
+# Local Postgres for developing against the Poke server.
+#   docker compose up -d
+#   DATABASE_URL=postgres://poke:poke@localhost:5432/poke npm run migrate
+services:
+  db:
+    image: postgres:16-alpine
+    environment:
+      POSTGRES_USER: poke
+      POSTGRES_PASSWORD: poke
+      POSTGRES_DB: poke
+    ports:
+      - "5432:5432"
+    volumes:
+      - poke-pgdata:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U poke"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+
+volumes:
+  poke-pgdata:

@@ -92,15 +92,15 @@ export function init(config: PokeConfig = {}): PokeInstance {
     // Host knows exactly who this is.
     user = config.user;
   } else {
-    // Poke manages a browser-local identity. A partial `{ name }` seeds it.
-    const seedName =
+    // Poke manages a browser-local identity. A partial `{ name }` passed on
+    // every load is an explicit "this is who's here" — it wins over a stored
+    // name. (A returning viewer with no `user` keeps the name they chose.)
+    const forceName =
       config.user && typeof config.user.name === "string"
         ? config.user.name
         : undefined;
-    identity = new LocalIdentity(
-      seedName ? { initialName: seedName } : {},
-    );
-    user = identity.user; // { id, name: <stored name> | "Anonymous", color }
+    identity = new LocalIdentity(forceName ? { forceName } : {});
+    user = identity.user; // { id, name: <name> | "Anonymous", color }
   }
 
   const store = new CommentStore({ adapter, pageId, user });

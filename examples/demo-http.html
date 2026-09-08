@@ -13,18 +13,30 @@
     </style>
   </head>
   <body>
-    <header><h1 data-testid="title">DB-backed Poke</h1></header>
+    <header><h1 data-testid="title">Multi-user Poke</h1></header>
     <main>
       <div class="card">
-        <h2 data-testid="section">Comments persist to SQLite via the reference server</h2>
-        <p>Leave a comment, resolve it, reload — it's still here, and it's in poke.db.</p>
+        <h2 data-testid="section">Comments live in Postgres, shared in realtime</h2>
+        <p>
+          Run <code>server/</code> (see its README), then open this page in two
+          tabs: <a href="?name=Ada">?name=Ada</a> and
+          <a href="?name=Grace">?name=Grace</a>. A pin one drops shows up for the
+          other within a second — no reload.
+        </p>
         <button class="demo" data-testid="cta">A button to pin</button>
       </div>
     </main>
     <script type="module">
       import { init, HttpAdapter } from "../dist/index.js";
+
+      // Multi-user: comments live in Postgres via the reference server, and
+      // realtime is automatic — HttpAdapter subscribes to the SSE stream, so a
+      // pin another person drops shows up here within a second.
+      // `?name=` just makes it easy to open two tabs as two people.
+      const name = new URLSearchParams(location.search).get("name");
+
       init({
-        user: { id: "http-demo", name: "HTTP Demo", color: "#0891b2" },
+        ...(name ? { user: { name } } : {}), // else: prompt + remember
         pageId: "http-demo-page",
         adapter: new HttpAdapter({ baseUrl: "http://localhost:4000" }),
       });

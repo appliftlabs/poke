@@ -52,6 +52,16 @@ describe("LocalIdentity", () => {
     expect(later.name).toBe("Chosen");
   });
 
+  it("forceName overrides a stored name (host asserts identity every load)", () => {
+    const a = new LocalIdentity();
+    a.setName("Old");
+
+    const b = new LocalIdentity({ forceName: "Authoritative" });
+    expect(b.name).toBe("Authoritative");
+    // and it persisted
+    expect(new LocalIdentity().name).toBe("Authoritative");
+  });
+
   it("works with an injected backend (no localStorage)", () => {
     let store: unknown = null;
     const backend = {
