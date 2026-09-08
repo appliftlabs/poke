@@ -18,9 +18,61 @@ BugHerd and Marker.io do. MIT licensed, free for any team.
 
 ## Status
 
-Early development. The **anchoring engine** — the part that makes a pin stay on
-the right element across reloads and layout changes — is built and tested. The
-comment-mode UI, pin rendering, and storage adapters are next.
+Early but usable. Working today:
+
+- **Anchoring engine** — pins stay on the right element across reloads and
+  layout changes (details below).
+- **Comment layer** — `Poke.init()` mounts an isolated overlay: comment mode
+  with a hover highlight, click-to-pin, threaded replies, resolve/reopen,
+  delete, and a sidebar listing every comment. Rendered with Preact inside a
+  Shadow DOM so it can't collide with the host page's styles or scripts.
+- **Storage** — storage-agnostic core with a bundled `LocalStorageAdapter`
+  (zero infra, syncs across tabs of the same origin). Bring your own backend by
+  implementing the `StorageAdapter` interface.
+
+Next: richer adapters (REST reference, Firebase), keyboard nav, screenshots
+attached to comments.
+
+## Quick start
+
+```html
+<script type="module">
+  import { init } from "@applift/poke";
+
+  init({
+    user: { id: currentUser.id, name: currentUser.name },
+    // no adapter → uses localStorage. Pass `adapter` to sync your own backend.
+  });
+</script>
+```
+
+Or the script tag, no build step:
+
+```html
+<script
+  src="https://unpkg.com/@applift/poke/dist/poke.global.js"
+  data-poke-user-id="u_12"
+  data-poke-user-name="Ada Lovelace"
+></script>
+```
+
+### Writing an adapter
+
+```ts
+import type { StorageAdapter } from "@applift/poke";
+
+class MyApiAdapter implements StorageAdapter {
+  listThreads(pageId) { return fetch(`/api/poke/${pageId}`).then(r => r.json()); }
+  createThread(thread) { return post("/api/poke", thread); }
+  addMessage({ threadId, body }) { return post(`/api/poke/${threadId}/messages`, { body }); }
+  updateThread(id, patch) { return patchReq(`/api/poke/${id}`, patch); }
+  updateMessage(id, body) { return patchReq(`/api/poke/messages/${id}`, { body }); }
+  deleteThread(id) { return del(`/api/poke/${id}`); }
+  // optional: subscribe(pageId, listener) — wire a WebSocket / SSE here for realtime
+}
+
+init({ user, adapter: new MyApiAdapter() });
+```
 
 ## The hard part: element anchoring
 
@@ -73,8 +125,15 @@ pins that landed on a shaky match.
 npm install
 npm test          # vitest, jsdom
 npm run typecheck
-npm run build      # dist/ — ESM, CJS, and a script-tag IIFE bundle
+npm run build     # dist/ — ESM, CJS, and a script-tag IIFE bundle
+
+# Try it: build, then serve and open examples/demo.html
+npx serve .
 ```
+
+`examples/demo.html` is the full comment layer on a sample page.
+`examples/anchor-playground.html` is a focused "shuffle the DOM and re-anchor"
+harness for the engine alone.
 
 ## License
 
