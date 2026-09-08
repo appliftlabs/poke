@@ -26,6 +26,9 @@ Early but usable. Working today:
   with a hover highlight, click-to-pin, threaded replies, resolve/reopen,
   delete, and a sidebar listing every comment. Rendered with Preact inside a
   Shadow DOM so it can't collide with the host page's styles or scripts.
+- **Identity** — pass a `user` if your app has accounts; otherwise Poke asks for
+  a name the first time someone comments and remembers it in that browser. The
+  name shows next to their comments for everyone.
 - **Storage** — storage-agnostic core with two bundled adapters:
   `LocalStorageAdapter` (zero infra, syncs across tabs) and `HttpAdapter`
   (persists to any REST backend, with optional SSE realtime). A ~200-line
@@ -44,14 +47,33 @@ npm install @applift/poke
 ```js
 import { init } from "@applift/poke";
 
-init({
-  user: { id: currentUser.id, name: currentUser.name },
-  // no adapter → uses localStorage. Pass `adapter` to sync your own backend.
-});
+// App with accounts — tell Poke who's here:
+init({ user: { id: currentUser.id, name: currentUser.name } });
+
+// Shared review link, no accounts — omit `user`. Poke asks for a name the
+// first time someone comments and remembers it in that browser:
+init();
+
+// (no `adapter` → localStorage. Pass `adapter` to sync your own backend.)
 ```
 
 Nothing else to install — Preact is bundled in, and Poke renders into its own
 Shadow DOM, so it won't touch your app's React/Preact/styles.
+
+### Identity
+
+| You pass | Author of comments | Name prompt |
+|---|---|---|
+| `user: { id, name }` | that user | never |
+| `user: { name: "Sam" }` | browser-local id, name pre-filled to "Sam" | never |
+| nothing | browser-local id | on first comment; then remembered |
+
+When Poke manages identity, `init()` returns an `identity` handle
+(`identity.name`, `identity.isNamed`, `identity.setName(...)`) if you'd rather
+drive the name yourself. The name and a stable anonymous id live in
+`localStorage` under `poke:identity`. This is not authentication — anyone can
+type any name — but it's the right weight for "a client opens a link and leaves
+feedback".
 
 Or the script tag, no build step at all:
 

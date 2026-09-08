@@ -68,6 +68,30 @@ describe("CommentStore", () => {
     ]);
   });
 
+  it("attributes a reply to the current user, not the thread author", async () => {
+    const store = makeStore();
+    await store.start();
+    const anchor = anchorFor(`<button data-testid="b">B</button>`, "button");
+    const t = await store.createThread({ anchor, body: "from Ada" });
+
+    store.setUser({ id: "u2", name: "Grace" });
+    await store.reply(t.id, "from Grace");
+
+    const msgs = store.getThread(t.id)!.messages;
+    expect(msgs[0]?.author.name).toBe("Ada");
+    expect(msgs[1]?.author.name).toBe("Grace");
+  });
+
+  it("setUser notifies subscribers", async () => {
+    const store = makeStore();
+    await store.start();
+    const seen = vi.fn();
+    store.subscribe(seen);
+    store.setUser({ id: "u9", name: "Nine" });
+    expect(seen).toHaveBeenCalled();
+    expect(store.user.name).toBe("Nine");
+  });
+
   it("toggles status", async () => {
     const store = makeStore();
     await store.start();

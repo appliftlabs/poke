@@ -146,14 +146,10 @@
     <script type="module">
       import { init } from "../dist/index.js";
 
-      init({
-        user: {
-          id: "demo-user",
-          name: "Demo Reviewer",
-          color: "#e11d48",
-        },
-        pageId: "poke-demo",
-      });
+      // No `user` passed: Poke asks for a name the first time you comment and
+      // remembers it in this browser. Pass `user: { id, name }` if your app
+      // already knows who this is.
+      init({ pageId: "poke-demo" });
     </script>
   </body>
 </html>

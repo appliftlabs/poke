@@ -2,9 +2,13 @@
  * The public entry point: `Poke.init(...)`.
  *
  *   import { init } from "@applift/poke";
- *   const poke = init({
- *     user: { id: "u_12", name: "Ada Lovelace" },
- *   });
+ *
+ *   // App with real accounts — pass the user:
+ *   init({ user: { id: "u_12", name: "Ada Lovelace" } });
+ *
+ *   // Shared review link, no accounts — omit it. Poke asks for a name the
+ *   // first time someone comments and remembers it in that browser:
+ *   init();
  *
  * With no adapter, Poke uses the bundled localStorage adapter — zero infra, good
  * for a quick trial or single-user review. Pass `adapter` to sync through your
@@ -12,13 +16,24 @@
  */
 import { LocalStorageAdapter } from "./adapters/local-storage.js";
 import type { StorageAdapter } from "./adapters/types.js";
+import { LocalIdentity } from "./core/identity.js";
 import { CommentStore } from "./core/store.js";
 import type { PokeUser } from "./core/types.js";
 import { mountUI, type MountHandle } from "./ui/mount.js";
 
 export interface PokeConfig {
-  /** The person leaving comments. Required — Poke never guesses identity. */
-  user: PokeUser;
+  /**
+   * The person leaving comments.
+   *
+   * Omit it and Poke manages a lightweight browser-local identity: a stable
+   * anonymous id, and a display name it prompts for the first time someone
+   * comments, then remembers (in localStorage) for their next visit. That name
+   * is shown to everyone else, exactly like a host-provided one.
+   *
+   * Pass it when your app already knows who the user is (they're logged in).
+   * You can also pass a partial `{ name }` to pre-fill the prompt.
+   */
+  user?: PokeUser | { name: string };
 
   /**
    * Identifies "this page" so comments are scoped to it. Defaults to
@@ -37,6 +52,13 @@ export interface PokeConfig {
 
 export interface PokeInstance {
   store: CommentStore;
+  /**
+   * The browser-local identity, when Poke is managing one (i.e. `user` was not
+   * a full `{ id, name }`). Use `identity.setName()` to wire up your own name
+   * prompt, or read `identity.name` / `identity.isNamed`. `null` when the host
+   * supplied a complete user.
+   */
+  identity: LocalIdentity | null;
   /** Render the overlay if it isn't already. */
   mount(): void;
   /** Remove the overlay (comments stay in storage). */
@@ -45,23 +67,52 @@ export interface PokeInstance {
   destroy(): Promise<void>;
 }
 
-export function init(config: PokeConfig): PokeInstance {
-  if (!config?.user?.id || !config.user.name) {
-    throw new Error(
-      "[poke] init() requires a `user` with at least { id, name }.",
-    );
-  }
+function isCompleteUser(u: PokeConfig["user"]): u is PokeUser {
+  return (
+    !!u &&
+    typeof (u as PokeUser).id === "string" &&
+    (u as PokeUser).id.length > 0 &&
+    typeof u.name === "string" &&
+    u.name.length > 0
+  );
+}
 
+export function init(config: PokeConfig = {}): PokeInstance {
   const pageId =
     config.pageId ??
     (typeof location !== "undefined" ? location.pathname : "default");
 
   const adapter = config.adapter ?? new LocalStorageAdapter();
-  const store = new CommentStore({ adapter, pageId, user: config.user });
+
+  // Resolve identity.
+  let identity: LocalIdentity | null = null;
+  let user: PokeUser;
+
+  if (isCompleteUser(config.user)) {
+    // Host knows exactly who this is.
+    user = config.user;
+  } else {
+    // Poke manages a browser-local identity. A partial `{ name }` seeds it.
+    const seedName =
+      config.user && typeof config.user.name === "string"
+        ? config.user.name
+        : undefined;
+    identity = new LocalIdentity(
+      seedName ? { initialName: seedName } : {},
+    );
+    user = identity.user; // { id, name: <stored name> | "Anonymous", color }
+  }
+
+  const store = new CommentStore({ adapter, pageId, user });
+
+  // Keep the store's user in sync with the identity's name as it changes.
+  if (identity) {
+    store.setUser(identity.user);
+  }
 
   let handle: MountHandle | null = null;
   const mount = () => {
-    if (!handle) handle = mountUI(store);
+    if (!handle) handle = mountUI(store, { identity });
   };
   const unmount = () => {
     handle?.unmount();
@@ -82,6 +133,7 @@ export function init(config: PokeConfig): PokeInstance {
 
   return {
     store,
+    identity,
     mount,
     unmount,
     async destroy() {

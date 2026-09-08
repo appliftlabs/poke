@@ -60,7 +60,7 @@ describe("LocalStorageAdapter", () => {
     a.createThread(t);
     await new Promise((r) => setTimeout(r, 2));
 
-    const msg = a.addMessage({ threadId: "t1", body: "a reply" });
+    const msg = a.addMessage({ threadId: "t1", body: "a reply", author: USER });
     expect(msg.body).toBe("a reply");
 
     const [reloaded] = a.listThreads("page-1");

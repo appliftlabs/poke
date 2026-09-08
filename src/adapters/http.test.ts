@@ -71,7 +71,10 @@ describe("HttpAdapter", () => {
   it("adds a message and returns the server's version", async () => {
     const fetch = mockFetch((url, init) => {
       expect(url).toBe("http://api/threads/t1/messages");
-      expect(JSON.parse(init.body as string)).toEqual({ body: "a reply" });
+      expect(JSON.parse(init.body as string)).toEqual({
+        body: "a reply",
+        author: USER,
+      });
       return {
         id: "srv-msg-1",
         threadId: "t1",
@@ -81,7 +84,7 @@ describe("HttpAdapter", () => {
       };
     });
     const a = new HttpAdapter({ baseUrl: "http://api", fetch, sseUrl: null });
-    const msg = await a.addMessage({ threadId: "t1", body: "a reply" });
+    const msg = await a.addMessage({ threadId: "t1", body: "a reply", author: USER });
     expect(msg.id).toBe("srv-msg-1");
   });
 

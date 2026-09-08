@@ -4,6 +4,7 @@
  * cannot affect it and its CSS cannot affect the host page.
  */
 import { h, render } from "preact";
+import type { LocalIdentity } from "../core/identity.js";
 import type { CommentStore } from "../core/store.js";
 import { Overlay } from "./components/Overlay.js";
 import { CSS } from "./styles.js";
@@ -15,7 +16,12 @@ export interface MountHandle {
   host: HTMLElement;
 }
 
-export function mountUI(store: CommentStore): MountHandle {
+export interface MountOptions {
+  /** Browser-local identity, if Poke is managing one (see poke.ts). */
+  identity?: LocalIdentity | null;
+}
+
+export function mountUI(store: CommentStore, options: MountOptions = {}): MountHandle {
   // Reuse an existing host if Poke was mounted before (HMR, double-init).
   let host = document.getElementById(HOST_ID) as HTMLElement | null;
   if (host) host.remove();
@@ -37,7 +43,10 @@ export function mountUI(store: CommentStore): MountHandle {
   mountPoint.style.pointerEvents = "none";
   shadow.appendChild(mountPoint);
 
-  render(h(Overlay, { store, hostEl: host }), mountPoint);
+  render(
+    h(Overlay, { store, hostEl: host, identity: options.identity ?? null }),
+    mountPoint,
+  );
 
   return {
     host,

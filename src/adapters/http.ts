@@ -106,9 +106,15 @@ export class HttpAdapter implements StorageAdapter {
   }
 
   addMessage(input: AddMessageInput): Promise<PokeMessage> {
+    // `author` is sent for backends without their own auth (like the reference
+    // server). A backend with sessions should ignore it and use the session
+    // user instead.
     return this.request<PokeMessage>(
       `/threads/${encodeURIComponent(input.threadId)}/messages`,
-      { method: "POST", body: JSON.stringify({ body: input.body }) },
+      {
+        method: "POST",
+        body: JSON.stringify({ body: input.body, author: input.author }),
+      },
     );
   }
 

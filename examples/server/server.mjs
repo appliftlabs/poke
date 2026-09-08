@@ -215,17 +215,13 @@ const server = createServer(async (req, res) => {
       const threadId = decodeURIComponent(parts[1]);
       const row = q.thread.get(threadId);
       if (!row) return send(res, 404, { error: "thread not found" });
-      const { body } = await readJson(req);
+      const { body, author } = await readJson(req);
       const now = Date.now();
       const id = `msg_${now}_${Math.random().toString(36).slice(2, 8)}`;
-      q.insertMessage.run(
-        id,
-        threadId,
-        row.author, // reply attributed to... see note below
-        String(body ?? ""),
-        now,
-        null,
-      );
+      // No auth here, so we trust the client's `author` (see note at bottom).
+      // A real backend derives this from the session and ignores the body.
+      const authorJson = author ? JSON.stringify(author) : row.author;
+      q.insertMessage.run(id, threadId, authorJson, String(body ?? ""), now, null);
       q.touchThread.run(now, threadId);
       notify(row.page_id);
       return send(res, 201, hydrateMessage(q.message.get(id)));
@@ -280,9 +276,10 @@ server.listen(PORT, () => {
 });
 
 /*
- * NOTE on reply attribution: this reference stores the reply's author as the
- * thread author, because it has no auth and can't trust a client-sent user.
- * A real backend derives the user from the session/token on every write and
- * passes it into insertMessage. The client's HttpAdapter deliberately sends
- * only { body } for a reply for this reason.
+ * NOTE on reply attribution: this reference has no auth, so it trusts the
+ * `author` the client sends with a reply (falling back to the thread author if
+ * absent). A real backend MUST NOT do this — derive the user from the
+ * session/token on every write and ignore any client-sent author. Poke's
+ * HttpAdapter sends `author` precisely so a no-auth backend like this one can
+ * attribute replies correctly.
  */

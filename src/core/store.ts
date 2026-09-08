@@ -23,7 +23,10 @@ import type {
 export interface CommentStoreOptions {
   adapter: StorageAdapter;
   pageId: string;
-  /** The current user; required to attribute new comments. */
+  /**
+   * The current user, used to attribute new comments. May be updated later via
+   * `setUser()` — e.g. when someone sets their display name after mount.
+   */
   user: PokeUser;
 }
 
@@ -34,15 +37,28 @@ export class CommentStore {
   private readonly subscribers = new Set<() => void>();
   private adapterUnsub: Unsubscribe | undefined;
   private loaded = false;
+  private currentUser: PokeUser;
 
-  constructor(private readonly opts: CommentStoreOptions) {}
+  constructor(private readonly opts: CommentStoreOptions) {
+    this.currentUser = opts.user;
+  }
 
   get pageId(): string {
     return this.opts.pageId;
   }
 
   get user(): PokeUser {
-    return this.opts.user;
+    return this.currentUser;
+  }
+
+  /**
+   * Replace the current user. New comments and replies are attributed to this
+   * user from now on; existing ones are unchanged. Notifies subscribers so the
+   * UI can react (e.g. hide the "set your name" prompt).
+   */
+  setUser(user: PokeUser): void {
+    this.currentUser = user;
+    this.emit();
   }
 
   /** Load threads and wire up adapter push events. Call once. */
@@ -96,12 +112,12 @@ export class CommentStore {
       status: "open",
       createdAt: now,
       updatedAt: now,
-      author: this.opts.user,
+      author: this.currentUser,
       messages: [
         {
           id: newId("msg"),
           threadId: id,
-          author: this.opts.user,
+          author: this.currentUser,
           body: input.body,
           createdAt: now,
         },
@@ -114,7 +130,11 @@ export class CommentStore {
   }
 
   async reply(threadId: string, body: string): Promise<void> {
-    await this.opts.adapter.addMessage({ threadId, body });
+    await this.opts.adapter.addMessage({
+      threadId,
+      body,
+      author: this.currentUser,
+    });
     await this.refresh();
   }
 

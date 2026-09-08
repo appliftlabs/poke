@@ -1,10 +1,12 @@
 import { useCallback, useEffect, useRef, useState } from "preact/hooks";
 import { useStoreThreads } from "../use-store.js";
 import { anchorPoint, captureAnchor, resolveAnchor } from "../../anchor/index.js";
+import type { LocalIdentity } from "../../core/identity.js";
 import type { CommentStore } from "../../core/store.js";
 import type { PokeThread } from "../../core/types.js";
 import { clampToViewport } from "../util.js";
 import { Composer } from "./Composer.js";
+import { NamePrompt } from "./NamePrompt.js";
 import { Sidebar } from "./Sidebar.js";
 import { ThreadCard } from "./ThreadCard.js";
 
@@ -12,6 +14,8 @@ interface OverlayProps {
   store: CommentStore;
   /** Host element to ignore clicks on (Poke's own shadow host). */
   hostEl: Element;
+  /** Browser-local identity, when Poke is managing one. */
+  identity: LocalIdentity | null;
 }
 
 type Draft = {
@@ -31,7 +35,7 @@ function pinViewportPoint(thread: PokeThread): { x: number; y: number } | null {
   return { x: v.x - window.scrollX, y: v.y - window.scrollY };
 }
 
-export function Overlay({ store, hostEl }: OverlayProps) {
+export function Overlay({ store, hostEl, identity }: OverlayProps) {
   const [, force] = useState(0);
   const rerender = useCallback(() => force((n) => n + 1), []);
 
@@ -44,6 +48,26 @@ export function Overlay({ store, hostEl }: OverlayProps) {
   const [sidebarOpen, setSidebarOpen] = useState(false);
   const [hoverRect, setHoverRect] = useState<DOMRect | null>(null);
   const rootRef = useRef<HTMLDivElement>(null);
+
+  // Name gate: when an unnamed viewer submits, stash the action and show the
+  // name prompt; run the action once they've picked a name.
+  const needsName = !!identity && !identity.isNamed;
+  const [pendingAction, setPendingAction] = useState<(() => void) | null>(null);
+  const [editingName, setEditingName] = useState(false);
+
+  const withName = (action: () => void) => {
+    if (needsName) setPendingAction(() => action);
+    else action();
+  };
+
+  const saveName = (name: string) => {
+    identity?.setName(name);
+    store.setUser(identity!.user);
+    setEditingName(false);
+    const next = pendingAction;
+    setPendingAction(null);
+    next?.();
+  };
 
   // Re-render on scroll/resize so pins track the elements they're anchored to.
   useEffect(() => {
@@ -106,11 +130,17 @@ export function Overlay({ store, hostEl }: OverlayProps) {
     ? threads.find((t) => t.id === activeId)
     : undefined;
 
-  const commitDraft = async (body: string) => {
+  const commitDraft = (body: string) => {
     if (!draft) return;
-    const created = await store.createThread({ anchor: draft.anchor, body });
-    setDraft(null);
-    setActiveId(created.id);
+    withName(async () => {
+      const created = await store.createThread({ anchor: draft.anchor, body });
+      setDraft(null);
+      setActiveId(created.id);
+    });
+  };
+
+  const commitReply = (threadId: string, body: string) => {
+    withName(() => void store.reply(threadId, body));
   };
 
   const focusThread = (t: PokeThread) => {
@@ -210,7 +240,7 @@ export function Overlay({ store, hostEl }: OverlayProps) {
               thread={activeThread}
               currentUser={store.user}
               style={pos}
-              onReply={(body) => store.reply(activeThread.id, body)}
+              onReply={(body) => commitReply(activeThread.id, body)}
               onResolveToggle={() =>
                 store.setStatus(
                   activeThread.id,
@@ -225,6 +255,26 @@ export function Overlay({ store, hostEl }: OverlayProps) {
             />
           );
         })()}
+
+      {/* name prompt — either gating a pending comment/reply, or an explicit
+          "set / change name" from the toolbar */}
+      {(pendingAction || editingName) && (
+        <NamePrompt
+          title={editingName ? "Your name" : "Add your name to comment"}
+          initial={identity?.name ?? ""}
+          style={clampToViewport(
+            window.innerWidth / 2 - 160,
+            window.innerHeight - 260,
+            320,
+            220,
+          )}
+          onSubmit={saveName}
+          onCancel={() => {
+            setPendingAction(null);
+            setEditingName(false);
+          }}
+        />
+      )}
 
       <Sidebar
         open={sidebarOpen}
@@ -255,6 +305,18 @@ export function Overlay({ store, hostEl }: OverlayProps) {
         >
           ☰ All
         </button>
+        {identity && (
+          <span class="poke-identity">
+            {identity.isNamed ? (
+              <>
+                <span>{identity.name}</span>
+                <button onClick={() => setEditingName(true)}>change</button>
+              </>
+            ) : (
+              <button onClick={() => setEditingName(true)}>Set your name</button>
+            )}
+          </span>
+        )}
       </div>
     </div>
   );

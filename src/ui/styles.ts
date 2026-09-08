@@ -210,6 +210,39 @@ export const CSS = /* css */ `
     border-color: #2563eb;
     box-shadow: 0 0 0 3px rgba(37, 99, 235, 0.15);
   }
+  .poke-input--single {
+    min-height: 0;
+    height: 38px;
+  }
+  .poke-note {
+    margin: 0;
+    font-size: 12px;
+    color: #64748b;
+  }
+  .poke-identity {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    font-size: 12px;
+    color: #64748b;
+    padding: 0 6px;
+    border-left: 1px solid #e4e7eb;
+    margin-left: 2px;
+  }
+  .poke-identity button {
+    appearance: none;
+    border: none;
+    background: transparent;
+    color: #2563eb;
+    cursor: pointer;
+    font: inherit;
+    font-size: 12px;
+    padding: 2px 4px;
+    border-radius: 4px;
+  }
+  .poke-identity button:hover {
+    background: #eff6ff;
+  }
   .poke-row {
     display: flex;
     gap: 6px;

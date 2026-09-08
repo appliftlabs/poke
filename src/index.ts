@@ -4,6 +4,11 @@
 export { init, type PokeConfig, type PokeInstance } from "./poke.js";
 
 export { CommentStore, type CommentStoreOptions } from "./core/store.js";
+export {
+  LocalIdentity,
+  type StoredIdentity,
+  type LocalIdentityOptions,
+} from "./core/identity.js";
 export type {
   PokeUser,
   PokeThread,

@@ -12,10 +12,26 @@ afterEach(() => {
 });
 
 describe("init", () => {
-  it("rejects a config without a usable user", () => {
-    // @ts-expect-error deliberately wrong
-    expect(() => init({})).toThrow(/user/);
-    expect(() => init({ user: { id: "", name: "" } })).toThrow(/user/);
+  it("works with no config — manages a browser-local identity", () => {
+    const poke = init();
+    expect(poke.identity).not.toBeNull();
+    expect(poke.identity!.id).toMatch(/^anon_/);
+    expect(poke.identity!.isNamed).toBe(false);
+    // store falls back to a placeholder name until one is set
+    expect(poke.store.user.name).toBe("Anonymous");
+  });
+
+  it("uses a host-provided complete user and skips local identity", () => {
+    const poke = init({ user: { id: "u1", name: "Ada" } });
+    expect(poke.identity).toBeNull();
+    expect(poke.store.user).toEqual({ id: "u1", name: "Ada" });
+  });
+
+  it("seeds the local identity name from a partial user", () => {
+    const poke = init({ user: { name: "Sam" } });
+    expect(poke.identity).not.toBeNull();
+    expect(poke.identity!.isNamed).toBe(true);
+    expect(poke.store.user.name).toBe("Sam");
   });
 
   it("mounts an isolated shadow-DOM overlay with a toolbar", async () => {

@@ -118,7 +118,7 @@ export class LocalStorageAdapter implements StorageAdapter {
     const message: PokeMessage = {
       id: newId("msg"),
       threadId: thread.id,
-      author: thread.author,
+      author: input.author,
       body: input.body,
       createdAt: Date.now(),
     };

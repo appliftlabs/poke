@@ -11,12 +11,20 @@
 import type {
   PokeMessage,
   PokeThread,
+  PokeUser,
   StoreListener,
 } from "../core/types.js";
 
 export interface AddMessageInput {
   threadId: string;
   body: string;
+  /**
+   * Who is posting this reply — the current user, which may differ from the
+   * thread's author. A backend with real auth should derive the author from the
+   * session instead of trusting this; adapters without auth (localStorage, the
+   * reference server) use it as-is.
+   */
+  author: PokeUser;
 }
 
 export interface StorageAdapter {
