@@ -31,7 +31,7 @@ Early but usable. Working today:
   name shows next to their comments for everyone.
 - **Storage** — `localStorage` by default (single browser), or a real backend
   for multi-user: a bundled `HttpAdapter` + the Postgres server in
-  [`server/`](server/), or your own `StorageAdapter`. See
+  [`server/`](https://github.com/yusuf-ishaku/poke/tree/main/server), or your own `StorageAdapter`. See
   [How it works](#how-it-works--the-two-pieces).
 
 Next: keyboard nav, screenshots attached to comments, a one-click server deploy.
@@ -50,9 +50,9 @@ Poke has a **client library** and (for teams) a **backend**.
    directly. The client sends comments to a small server over HTTP; the server
    owns the database and pushes changes to everyone viewing the page.
 
-   Poke ships one: [`server/`](server/) — Postgres-backed, ~350 lines, one
+   Poke ships one: [`server/`](https://github.com/yusuf-ishaku/poke/tree/main/server) — Postgres-backed, ~350 lines, one
    dependency. **You run your own copy** (Railway, Fly, Docker, a VPS — see
-   [`server/README.md`](server/README.md)). Every team self-hosts their own; there
+   [`server/README.md`](https://github.com/yusuf-ishaku/poke/blob/main/server/README.md)). Every team self-hosts their own; there
    is no shared "Poke" service. Or write a
    [`StorageAdapter`](#writing-a-custom-adapter-supabase-firebase-your-own-api)
    against Supabase, Firebase, or your existing API instead.
@@ -87,7 +87,7 @@ Shadow DOM, so it won't touch your app's React/Preact/styles.
 ### Framework setup
 
 Poke touches `window`/`document`, so it must run in the browser only. Runnable
-versions of each of these are in [`examples/frameworks/`](examples/frameworks/).
+versions of each of these are in [`examples/frameworks/`](https://github.com/yusuf-ishaku/poke/tree/main/examples/frameworks).
 
 <details>
 <summary><b>Vanilla / plain HTML</b></summary>
@@ -243,9 +243,9 @@ Or the script tag, no build step at all:
 
 ### Going multi-user
 
-**1. Run the backend.** Deploy your own copy of [`server/`](server/) —
+**1. Run the backend.** Deploy your own copy of [`server/`](https://github.com/yusuf-ishaku/poke/tree/main/server) —
 full instructions (Railway, Fly, Docker, plain Node) are in
-[`server/README.md`](server/README.md). Locally it's:
+[`server/README.md`](https://github.com/yusuf-ishaku/poke/blob/main/server/README.md). Locally it's:
 
 ```bash
 cd server && npm install
