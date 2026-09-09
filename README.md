@@ -116,46 +116,65 @@ or the no-bundler script tag:
 ```tsx
 // Poke.tsx
 import { useEffect } from "react";
+import { useLocation } from "react-router-dom"; // or your router's equivalent
 
 export function Poke() {
+  const { pathname } = useLocation();
+
   useEffect(() => {
     let poke: { destroy(): void } | undefined;
+    let cancelled = false;
     import("@appliftlabs/poke").then(({ init, HttpAdapter }) => {
+      if (cancelled) return;
       poke = init({
-        pageId: window.location.pathname,
+        pageId: pathname,
         adapter: new HttpAdapter({ baseUrl: import.meta.env.VITE_POKE_URL }),
       });
     });
-    return () => poke?.destroy();
-  }, []);
+    return () => { cancelled = true; poke?.destroy(); };
+  }, [pathname]); // re-init on route change so comments scope per page
   return null;
 }
 ```
 
-Render `<Poke />` once, near the root (in `App`).
+Render `<Poke />` once, near the root (in `App`). No router? Pass a stable
+`pageId` string yourself, or drop the dep and use `window.location.pathname`
+for a single-page app.
 </details>
 
 <details>
 <summary><b>Next.js</b></summary>
 
-**App Router** — `app/layout.tsx` is a Server Component, so use a client child:
+**App Router** — `app/layout.tsx` is a Server Component, so use a client child.
+Key detail: re-run on route change so comments scope per page.
 
 ```tsx
 // app/poke.tsx
 "use client";
 import { useEffect } from "react";
+import { usePathname } from "next/navigation";
 
 export function Poke() {
+  const pathname = usePathname();
+
   useEffect(() => {
     let poke: { destroy(): void } | undefined;
+    let cancelled = false;
+
     import("@appliftlabs/poke").then(({ init, HttpAdapter }) => {
+      if (cancelled) return;
       poke = init({
-        pageId: window.location.pathname,
+        pageId: pathname, // NOT window.location.pathname — that won't update
         adapter: new HttpAdapter({ baseUrl: process.env.NEXT_PUBLIC_POKE_URL! }),
       });
     });
-    return () => poke?.destroy();
-  }, []);
+
+    return () => {
+      cancelled = true;
+      poke?.destroy();
+    };
+  }, [pathname]); // re-init when the route changes
+
   return null;
 }
 ```
@@ -170,9 +189,35 @@ export default function RootLayout({ children }) {
 }
 ```
 
-**Pages Router** — the same `useEffect` block in `pages/_app.tsx`.
+**Pages Router** — same idea in `pages/_app.tsx`, keyed on `router.pathname`:
 
-The dynamic `import()` inside `useEffect` keeps Poke out of the server bundle.
+```tsx
+import { useEffect } from "react";
+import { useRouter } from "next/router";
+
+// inside App({ Component, pageProps })
+const router = useRouter();
+useEffect(() => {
+  let poke: { destroy(): void } | undefined;
+  let cancelled = false;
+  import("@appliftlabs/poke").then(({ init, HttpAdapter }) => {
+    if (cancelled) return;
+    poke = init({
+      pageId: router.pathname,
+      adapter: new HttpAdapter({ baseUrl: process.env.NEXT_PUBLIC_POKE_URL! }),
+    });
+  });
+  return () => { cancelled = true; poke?.destroy(); };
+}, [router.pathname]);
+```
+
+The dynamic `import()` inside `useEffect` keeps Poke out of the server bundle;
+the `cancelled` guard stops a stale instance mounting if you navigate again
+before the import resolves.
+
+> **`window.location.pathname` with `[]` deps is the #1 mistake** — it captures
+> the first route and never updates, so every page shows the same comments. Use
+> the reactive `usePathname()` / `router.pathname` and depend on it.
 </details>
 
 <details>
@@ -212,9 +257,12 @@ or as a component with `onMounted` / `onUnmounted` calling `init()` / `destroy()
 ```
 </details>
 
-**Client-side routing:** `pageId` is read once at `init()`. To re-scope comments
-when the route changes, call `poke.destroy()` then `init()` again with the new
-`pageId` — hook it to your router's navigation event.
+**Why the effect re-runs on route change:** `pageId` is fixed for the life of an
+`init()` call — Poke doesn't watch the URL itself. Each snippet above keys its
+effect on the router's current path, so navigating tears down the old instance
+and re-inits with the new `pageId`. That's what scopes comments per page. If you
+want one shared comment set across several routes, pass a constant `pageId`
+instead.
 
 ### Identity
 
