@@ -24,11 +24,12 @@
 "use client";
 
 import { useEffect } from "react";
-import { usePathname } from "next/navigation";
+import { usePathname, useRouter } from "next/navigation";
 import type { PokeInstance } from "@appliftlabs/poke";
 
 export function Poke() {
   const pathname = usePathname();
+  const router = useRouter();
 
   useEffect(() => {
     let instance: PokeInstance | undefined;
@@ -43,6 +44,8 @@ export function Poke() {
         adapter: new HttpAdapter({
           baseUrl: process.env.NEXT_PUBLIC_POKE_URL!,
         }),
+        // "☰ All" sidebar: selecting a comment on another route routes there.
+        onNavigate: (pageId) => router.push(pageId),
       });
     });
 
@@ -51,7 +54,7 @@ export function Poke() {
       instance?.destroy();
     };
     // Re-run on route change so comments are scoped per page.
-  }, [pathname]);
+  }, [pathname, router]);
 
   return null;
 }

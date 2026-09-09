@@ -54,6 +54,18 @@ describe("LocalStorageAdapter", () => {
     expect(a.listThreads("page-2")).toHaveLength(1);
   });
 
+  it("listAllThreads spans every page, in creation order", async () => {
+    const a = new LocalStorageAdapter();
+    a.createThread(makeThread("t1", "page-1"));
+    await new Promise((r) => setTimeout(r, 2));
+    a.createThread(makeThread("t2", "page-2"));
+    await new Promise((r) => setTimeout(r, 2));
+    a.createThread(makeThread("t3", "page-1"));
+
+    const all = a.listAllThreads();
+    expect(all.map((t) => t.id)).toEqual(["t1", "t2", "t3"]);
+  });
+
   it("appends messages and bumps updatedAt", async () => {
     const a = new LocalStorageAdapter();
     const t = makeThread("t1");

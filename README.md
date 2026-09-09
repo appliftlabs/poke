@@ -264,6 +264,21 @@ and re-inits with the new `pageId`. That's what scopes comments per page. If you
 want one shared comment set across several routes, pass a constant `pageId`
 instead.
 
+**The sidebar spans the whole app.** Pins are per-page, but the "☰ All" sidebar
+lists every comment across every route (when your backend supports it — the
+bundled server and adapters do). Selecting a comment from another route calls
+`onNavigate(pageId)` so your router can go there:
+
+```js
+init({
+  adapter: ...,
+  onNavigate: (pageId) => router.push(pageId), // Next: useRouter().push
+});
+```
+
+Without `onNavigate`, Poke does `location.assign(pageId)` — works if `pageId`
+is a real path, but it's a full reload.
+
 ### Identity
 
 | You pass | Author of comments | Name prompt |
@@ -326,13 +341,18 @@ That's it — pins now sync live for everyone on the page.
 
 | Method | Path | Body | Returns |
 |---|---|---|---|
-| `GET` | `/pages/:pageId/threads` | — | `PokeThread[]` |
+| `GET` | `/pages/:pageId/threads` | — | `PokeThread[]` (one page) |
+| `GET` | `/threads` | — | `PokeThread[]` (all pages — powers the sidebar) |
 | `POST` | `/threads` | `PokeThread` | `201` |
 | `POST` | `/threads/:id/messages` | `{ body, author }` | `PokeMessage` |
 | `PATCH` | `/threads/:id` | `{ status }` | `200` |
 | `PATCH` | `/messages/:id` | `{ body }` | `200` |
 | `DELETE` | `/threads/:id` | — | `204` |
 | `GET` | `/pages/:pageId/events` | — | SSE stream (optional) |
+| `GET` | `/pages/*/events` | — | SSE stream for *any* page (sidebar realtime) |
+
+`GET /threads` and the `*` event channel are optional — an adapter that omits
+`listAllThreads` just shows the current page in the sidebar.
 
 </details>
 

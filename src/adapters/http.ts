@@ -98,6 +98,11 @@ export class HttpAdapter implements StorageAdapter {
     );
   }
 
+  /** GET {baseUrl}/threads -> every thread in the deployment's namespace. */
+  listAllThreads(): Promise<PokeThread[]> {
+    return this.request<PokeThread[]>("/threads");
+  }
+
   async createThread(thread: PokeThread): Promise<void> {
     await this.request<void>("/threads", {
       method: "POST",
@@ -147,22 +152,34 @@ export class HttpAdapter implements StorageAdapter {
     }
     const template =
       this.opts.sseUrl ?? `${this.opts.baseUrl}/pages/:pageId/events`;
-    const url = template.replace(":pageId", encodeURIComponent(pageId));
 
-    const src = new EventSource(url, {
-      withCredentials: this.opts.credentials === "include",
-    });
-    // Any event = "state changed, reload". A richer backend could send typed
-    // deltas and this could forward them, but reload is correct and simple.
-    src.onmessage = () => listener({ type: "reload" });
-    src.onerror = () => {
-      /* EventSource auto-reconnects; nothing to do */
+    const open = (channel: string): EventSource => {
+      const url = template.replace(":pageId", encodeURIComponent(channel));
+      const src = new EventSource(url, {
+        withCredentials: this.opts.credentials === "include",
+      });
+      // Any event = "state changed, reload". CommentStore.refresh() re-reads
+      // both the current page and (if supported) all pages, so one listener
+      // covers pins and the sidebar.
+      src.onmessage = () => listener({ type: "reload" });
+      src.onerror = () => {
+        /* EventSource auto-reconnects; nothing to do */
+      };
+      return src;
     };
-    this.sources.set(pageId, src);
+
+    // Current page (for pins) + the app-wide channel (for the sidebar). The
+    // server dedups nothing, but a double reload is harmless and cheap.
+    const pageSrc = open(pageId);
+    const allSrc = open("*");
+    this.sources.set(pageId, pageSrc);
+    this.sources.set(`${pageId}::all`, allSrc);
 
     return () => {
-      src.close();
+      pageSrc.close();
+      allSrc.close();
       this.sources.delete(pageId);
+      this.sources.delete(`${pageId}::all`);
     };
   }
 

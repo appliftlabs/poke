@@ -16,6 +16,12 @@ interface OverlayProps {
   hostEl: Element;
   /** Browser-local identity, when Poke is managing one. */
   identity: LocalIdentity | null;
+  /**
+   * Called when the viewer picks a comment that lives on another page. The host
+   * should route there (its own router, ideally). If not provided, Poke does a
+   * full `location.assign(pageId)` — works when pageId is a real path.
+   */
+  onNavigate?: (pageId: string) => void;
 }
 
 type Draft = {
@@ -35,12 +41,18 @@ function pinViewportPoint(thread: PokeThread): { x: number; y: number } | null {
   return { x: v.x - window.scrollX, y: v.y - window.scrollY };
 }
 
-export function Overlay({ store, hostEl, identity }: OverlayProps) {
+export function Overlay({
+  store,
+  hostEl,
+  identity,
+  onNavigate,
+}: OverlayProps) {
   const [, force] = useState(0);
   const rerender = useCallback(() => force((n) => n + 1), []);
 
   // Threads, kept live via a synchronous store subscription.
-  const threads = useStoreThreads(store);
+  // `page` -> pins on the current route; `all` -> the sidebar list.
+  const { page: threads, all: allThreads } = useStoreThreads(store);
 
   const [mode, setMode] = useState<"idle" | "comment">("idle");
   const [draft, setDraft] = useState<Draft | null>(null);
@@ -143,7 +155,15 @@ export function Overlay({ store, hostEl, identity }: OverlayProps) {
     withName(() => void store.reply(threadId, body));
   };
 
-  const focusThread = (t: PokeThread) => {
+  const focusThread = (t: PokeThread, samePage: boolean) => {
+    if (!samePage) {
+      // The comment is on another route. Hand off to the host's router, or
+      // fall back to a hard navigation. Poke re-inits on the new page and the
+      // pin will be there.
+      if (onNavigate) onNavigate(t.pageId);
+      else window.location.assign(t.pageId);
+      return;
+    }
     setActiveId(t.id);
     setSidebarOpen(false);
     const p = pinViewportPoint(t);
@@ -278,7 +298,8 @@ export function Overlay({ store, hostEl, identity }: OverlayProps) {
 
       <Sidebar
         open={sidebarOpen}
-        threads={threads}
+        threads={allThreads}
+        currentPageId={store.pageId}
         activeId={activeId}
         onClose={() => setSidebarOpen(false)}
         onSelect={focusThread}
@@ -296,8 +317,11 @@ export function Overlay({ store, hostEl, identity }: OverlayProps) {
         >
           {mode === "comment" ? "● Click an element…" : "💬 Comment"}
         </button>
-        <span class="poke-count">
-          {openCount} open{threads.length !== openCount ? ` · ${threads.length} total` : ""}
+        <span class="poke-count" title="open on this page">
+          {openCount} here
+          {allThreads.length > threads.length
+            ? ` · ${allThreads.length} in app`
+            : ""}
         </span>
         <button
           class="poke-btn poke-btn--ghost"

@@ -33,7 +33,13 @@ export interface CommentStoreOptions {
 type Unsubscribe = () => void;
 
 export class CommentStore {
+  /** Threads on the current page — these get pins drawn. */
   private threads: PokeThread[] = [];
+  /**
+   * Every thread across the whole app/project — powers the "all comments"
+   * sidebar. Empty if the adapter doesn't support `listAllThreads`.
+   */
+  private allThreads: PokeThread[] = [];
   private readonly subscribers = new Set<() => void>();
   private adapterUnsub: Unsubscribe | undefined;
   private loaded = false;
@@ -82,18 +88,43 @@ export class CommentStore {
 
   /** Re-read everything from the adapter and re-resolve anchors. */
   async refresh(): Promise<void> {
-    const threads = await this.opts.adapter.listThreads(this.opts.pageId);
-    this.threads = threads.map((t) => this.withResolution(t));
+    const [pageThreads, all] = await Promise.all([
+      this.opts.adapter.listThreads(this.opts.pageId),
+      this.opts.adapter.listAllThreads?.() ?? Promise.resolve(null),
+    ]);
+
+    this.threads = pageThreads.map((t) => this.withResolution(t));
+
+    if (all) {
+      // Keep resolution info for threads that are also on this page.
+      const resolvedById = new Map(this.threads.map((t) => [t.id, t]));
+      this.allThreads = all.map((t) => resolvedById.get(t.id) ?? t);
+    } else {
+      // Adapter can't list app-wide — the sidebar shows the current page only.
+      this.allThreads = this.threads;
+    }
+
     this.emit();
   }
 
-  /** Current threads, with fresh anchor resolution. */
+  /** Threads on the current page, with fresh anchor resolution. Drives pins. */
   list(): PokeThread[] {
     return this.threads;
   }
 
+  /**
+   * Every thread across the app (or the current page, if the adapter can't do
+   * app-wide). Drives the "all comments" sidebar.
+   */
+  listAll(): PokeThread[] {
+    return this.allThreads;
+  }
+
   getThread(id: string): PokeThread | undefined {
-    return this.threads.find((t) => t.id === id);
+    return (
+      this.threads.find((t) => t.id === id) ??
+      this.allThreads.find((t) => t.id === id)
+    );
   }
 
   /** Recompute where every thread's pin should sit (call on layout changes). */

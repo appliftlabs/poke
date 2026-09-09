@@ -11,7 +11,14 @@ import type { PokeThread } from "../core/types.js";
  * wouldn't trigger the initial paint's data being "current". This hook
  * subscribes synchronously on first render and reconciles in the effect.
  */
-export function useStoreThreads(store: CommentStore): PokeThread[] {
+export interface StoreThreads {
+  /** Threads on the current page — these get pins. */
+  page: PokeThread[];
+  /** Every thread across the app — drives the sidebar. */
+  all: PokeThread[];
+}
+
+export function useStoreThreads(store: CommentStore): StoreThreads {
   const [, setN] = useState(0);
   const forceRender = () => setN((n) => (n + 1) % 1_000_000);
   const unsubRef = useRef<(() => void) | null>(null);
@@ -29,5 +36,5 @@ export function useStoreThreads(store: CommentStore): PokeThread[] {
     };
   }, [store]);
 
-  return store.list();
+  return { page: store.list(), all: store.listAll() };
 }

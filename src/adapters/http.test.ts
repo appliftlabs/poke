@@ -54,6 +54,16 @@ describe("HttpAdapter", () => {
     expect(list[0]?.id).toBe("t1");
   });
 
+  it("lists every thread from GET /threads", async () => {
+    const fetch = mockFetch((url) => {
+      expect(url).toBe("http://api/poke/threads");
+      return [thread("t1"), thread("t2")];
+    });
+    const a = new HttpAdapter({ baseUrl: "http://api/poke", fetch, sseUrl: null });
+    const all = await a.listAllThreads();
+    expect(all.map((t) => t.id)).toEqual(["t1", "t2"]);
+  });
+
   it("POSTs a new thread as JSON", async () => {
     let seen: { url: string; init: RequestInit } | null = null;
     const fetch = mockFetch((url, init) => {

@@ -46,6 +46,16 @@ export interface PokeConfig {
   /** Storage backend. Defaults to a localStorage adapter. */
   adapter?: StorageAdapter;
 
+  /**
+   * The sidebar lists comments from the whole app, including other routes.
+   * Selecting one of those calls this so your app can route there. If omitted,
+   * Poke does `location.assign(pageId)` — fine when `pageId` is a real path,
+   * but a hard reload. Pass your router's navigate for a smooth transition:
+   *
+   *   onNavigate: (pageId) => router.push(pageId)
+   */
+  onNavigate?: (pageId: string) => void;
+
   /** Start with the UI mounted. Default true. */
   autoMount?: boolean;
 }
@@ -112,7 +122,12 @@ export function init(config: PokeConfig = {}): PokeInstance {
 
   let handle: MountHandle | null = null;
   const mount = () => {
-    if (!handle) handle = mountUI(store, { identity });
+    if (!handle) {
+      handle = mountUI(store, {
+        identity,
+        ...(config.onNavigate ? { onNavigate: config.onNavigate } : {}),
+      });
+    }
   };
   const unmount = () => {
     handle?.unmount();

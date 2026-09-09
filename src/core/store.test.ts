@@ -150,4 +150,76 @@ describe("CommentStore", () => {
     // storeB subscribed to the same adapter, so its list should now include it.
     expect(storeB.list().some((t) => t.messages[0]?.body === "from A")).toBe(true);
   });
+
+  describe("app-wide thread list (listAll)", () => {
+    it("list() is the current page; listAll() spans every page", async () => {
+      const shared = new LocalStorageAdapter();
+      const onDash = new CommentStore({
+        adapter: shared,
+        pageId: "/dashboard",
+        user: USER,
+      });
+      const onSettings = new CommentStore({
+        adapter: shared,
+        pageId: "/settings",
+        user: USER,
+      });
+      await onDash.start();
+      await onSettings.start();
+
+      const a = anchorFor(`<button data-testid="d">D</button>`, "button");
+      await onDash.createThread({ anchor: a, body: "on dashboard" });
+      const b = anchorFor(`<button data-testid="s">S</button>`, "button");
+      await onSettings.createThread({ anchor: b, body: "on settings" });
+
+      await onDash.refresh();
+
+      // Pins on /dashboard: just the dashboard thread.
+      expect(onDash.list().map((t) => t.messages[0]?.body)).toEqual([
+        "on dashboard",
+      ]);
+      // Sidebar: both.
+      expect(onDash.listAll().map((t) => t.messages[0]?.body).sort()).toEqual([
+        "on dashboard",
+        "on settings",
+      ]);
+    });
+
+    it("falls back to the current page when the adapter can't list app-wide", async () => {
+      // An adapter without listAllThreads.
+      const minimal = {
+        listThreads: () => [
+          {
+            id: "t1",
+            pageId: "p1",
+            anchor: anchorFor(`<button>x</button>`, "button"),
+            status: "open" as const,
+            createdAt: 1,
+            updatedAt: 1,
+            author: USER,
+            messages: [],
+          },
+        ],
+        createThread: () => {},
+        addMessage: () => ({
+          id: "m",
+          threadId: "t1",
+          author: USER,
+          body: "",
+          createdAt: 1,
+        }),
+        updateThread: () => {},
+        updateMessage: () => {},
+        deleteThread: () => {},
+      };
+      const store = new CommentStore({
+        adapter: minimal,
+        pageId: "p1",
+        user: USER,
+      });
+      await store.start();
+      expect(store.listAll()).toEqual(store.list());
+      expect(store.listAll()).toHaveLength(1);
+    });
+  });
 });

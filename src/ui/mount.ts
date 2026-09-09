@@ -19,6 +19,8 @@ export interface MountHandle {
 export interface MountOptions {
   /** Browser-local identity, if Poke is managing one (see poke.ts). */
   identity?: LocalIdentity | null;
+  /** Route to another page when a cross-page comment is selected. */
+  onNavigate?: (pageId: string) => void;
 }
 
 export function mountUI(store: CommentStore, options: MountOptions = {}): MountHandle {
@@ -28,10 +30,27 @@ export function mountUI(store: CommentStore, options: MountOptions = {}): MountH
 
   host = document.createElement("div");
   host.id = HOST_ID;
-  // The host itself takes no space and never intercepts pointer events; the
-  // overlay inside re-enables pointer events on just its interactive bits.
-  host.style.cssText =
-    "position:fixed;inset:0;width:0;height:0;pointer-events:none;";
+  // The host takes no space and never intercepts pointer events; the overlay
+  // inside re-enables pointer events on just its interactive bits.
+  //
+  // The z-index goes on the HOST, not the inner .poke-root — the host is what
+  // participates in the page's stacking context. Max int32 so nothing on the
+  // host page can legitimately sit above it. `!important` in case the host page
+  // has an aggressive `div { z-index: ... }` rule.
+  host.style.cssText = [
+    "position: fixed !important",
+    "inset: 0 !important",
+    "width: 0 !important",
+    "height: 0 !important",
+    "margin: 0 !important",
+    "padding: 0 !important",
+    "border: 0 !important",
+    "pointer-events: none !important",
+    "z-index: 2147483647 !important",
+    // Don't let a transformed/filtered ancestor trap us in its stacking context.
+    "transform: none !important",
+    "filter: none !important",
+  ].join(";");
   document.body.appendChild(host);
 
   const shadow = host.attachShadow({ mode: "open" });
@@ -44,7 +63,12 @@ export function mountUI(store: CommentStore, options: MountOptions = {}): MountH
   shadow.appendChild(mountPoint);
 
   render(
-    h(Overlay, { store, hostEl: host, identity: options.identity ?? null }),
+    h(Overlay, {
+      store,
+      hostEl: host,
+      identity: options.identity ?? null,
+      ...(options.onNavigate ? { onNavigate: options.onNavigate } : {}),
+    }),
     mountPoint,
   );
 

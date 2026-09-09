@@ -6,6 +6,11 @@
 export const CSS = /* css */ `
   :host {
     all: initial;
+    /* The real stacking wins on the host element (set in mount.ts); this keeps
+       the shadow contents above each other predictably. */
+    position: fixed;
+    inset: 0;
+    z-index: 2147483647;
   }
   * {
     box-sizing: border-box;
@@ -13,7 +18,7 @@ export const CSS = /* css */ `
   .poke-root {
     position: fixed;
     inset: 0;
-    z-index: 2147483000;
+    z-index: 2147483647;
     pointer-events: none;
     font-family: ui-sans-serif, system-ui, -apple-system, "Segoe UI", Roboto,
       Helvetica, Arial, sans-serif;
@@ -279,7 +284,7 @@ export const CSS = /* css */ `
 
   /* ---- sidebar (list of all comments) ---- */
   .poke-sidebar {
-    position: absolute;
+    position: fixed;
     top: 0;
     right: 0;
     bottom: 0;
@@ -293,6 +298,8 @@ export const CSS = /* css */ `
     flex-direction: column;
     transform: translateX(100%);
     transition: transform 180ms ease;
+    /* above pins, thread cards, and the toolbar */
+    z-index: 10;
   }
   .poke-sidebar--open {
     transform: none;
@@ -308,6 +315,21 @@ export const CSS = /* css */ `
   .poke-sidebar__list {
     flex: 1;
     overflow-y: auto;
+  }
+  .poke-sidebar__group {
+    position: sticky;
+    top: 0;
+    background: #f8fafc;
+    color: #64748b;
+    font-size: 11px;
+    font-weight: 600;
+    text-transform: uppercase;
+    letter-spacing: 0.03em;
+    padding: 6px 16px;
+    border-bottom: 1px solid #eef2f6;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
   }
   .poke-listitem {
     padding: 12px 16px;

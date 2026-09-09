@@ -103,15 +103,18 @@ function cleanAuthor(a) {
 
 // --- realtime (SSE) --------------------------------------------------
 
-/** key `${projectId}::${pageId}` -> Set<ServerResponse> */
+/**
+ * key `${projectId}::${pageId}` -> Set<ServerResponse>.
+ * The special pageId "*" is an app-wide channel: a client on it is told about
+ * writes to any page (powers the "all comments" sidebar).
+ */
 const streams = new Map();
 
 function streamKey(pageId) {
   return `${PROJECT}::${pageId}`;
 }
 
-function fanout(pageId) {
-  const set = streams.get(streamKey(pageId));
+function writeChanged(set) {
   if (!set) return;
   for (const res of set) {
     try {
@@ -120,6 +123,11 @@ function fanout(pageId) {
       /* client gone; cleaned up on 'close' */
     }
   }
+}
+
+function fanout(pageId) {
+  writeChanged(streams.get(streamKey(pageId)));
+  writeChanged(streams.get(streamKey("*"))); // app-wide subscribers
 }
 
 // heartbeat so proxies / load balancers don't drop idle SSE connections
@@ -137,12 +145,13 @@ setInterval(() => {
 
 // --- queries ---------------------------------------------------------
 
+/** @param {string|null} pageId  a page id, or null for every page in PROJECT */
 async function listThreads(pageId) {
   const { rows: threadRows } = await pool.query(
-    `SELECT * FROM poke_threads
-       WHERE project_id = $1 AND page_id = $2
-       ORDER BY created_at ASC`,
-    [PROJECT, pageId],
+    pageId === null
+      ? `SELECT * FROM poke_threads WHERE project_id = $1 ORDER BY created_at ASC`
+      : `SELECT * FROM poke_threads WHERE project_id = $1 AND page_id = $2 ORDER BY created_at ASC`,
+    pageId === null ? [PROJECT] : [PROJECT, pageId],
   );
   if (threadRows.length === 0) return [];
 
@@ -184,6 +193,11 @@ const server = createServer(async (req, res) => {
     if (method === "GET" && parts[0] === "health") {
       await pool.query("SELECT 1");
       return send(res, req, 200, { ok: true, project: PROJECT });
+    }
+
+    // GET /threads  -> every thread in this deployment's namespace
+    if (method === "GET" && parts[0] === "threads" && parts.length === 1) {
+      return send(res, req, 200, await listThreads(null));
     }
 
     // GET /pages/:pageId/threads

@@ -106,6 +106,12 @@ export class LocalStorageAdapter implements StorageAdapter {
     return this.read(pageId).sort((a, b) => a.createdAt - b.createdAt);
   }
 
+  listAllThreads(): PokeThread[] {
+    const all: PokeThread[] = [];
+    for (const pageId of this.knownPages()) all.push(...this.read(pageId));
+    return all.sort((a, b) => a.createdAt - b.createdAt);
+  }
+
   createThread(thread: PokeThread): void {
     const threads = this.read(thread.pageId);
     threads.push(thread);

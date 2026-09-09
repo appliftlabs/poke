@@ -1,0 +1,45 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Poke — multi-route sidebar test</title>
+    <style>
+      body { font-family: system-ui, sans-serif; margin: 0; padding: 40px; }
+      nav a { margin-right: 16px; }
+      .view { margin-top: 24px; padding: 24px; border: 1px solid #ddd; border-radius: 8px; }
+      button.t { padding: 10px 16px; }
+    </style>
+  </head>
+  <body>
+    <nav>
+      <a href="#/dashboard">Dashboard</a>
+      <a href="#/settings">Settings</a>
+      <a href="#/billing">Billing</a>
+    </nav>
+    <div class="view" id="view"></div>
+
+    <script type="module">
+      import { init, HttpAdapter } from "../dist/index.js";
+
+      let poke;
+      const routeId = () => location.hash.slice(1) || "/dashboard";
+
+      function mount() {
+        poke?.destroy();
+        const id = routeId();
+        document.getElementById("view").innerHTML =
+          `<h2>${id}</h2><button class="t" data-testid="btn-${id.slice(1)}">A button on ${id}</button>`;
+        poke = init({
+          user: { name: new URLSearchParams(location.search).get("name") || undefined },
+          pageId: id,
+          adapter: new HttpAdapter({ baseUrl: "http://localhost:4000" }),
+          onNavigate: (pageId) => { location.hash = pageId; },
+        });
+      }
+
+      window.addEventListener("hashchange", mount);
+      mount();
+    </script>
+  </body>
+</html>

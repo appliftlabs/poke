@@ -34,8 +34,18 @@ export interface StorageAdapter {
    */
   init?(): Promise<void> | void;
 
-  /** All threads for a page, in creation order. */
+  /** All threads for one page, in creation order. */
   listThreads(pageId: string): Promise<PokeThread[]> | PokeThread[];
+
+  /**
+   * Every thread this adapter can see, across all pages, in creation order.
+   * Powers the "all comments" sidebar. Optional: if an adapter can't do this
+   * efficiently, omit it and the sidebar falls back to the current page only.
+   *
+   * For a backend, "all" means all threads in this deployment's namespace
+   * (e.g. the server's POKE_PROJECT). It is not meant to cross projects.
+   */
+  listAllThreads?(): Promise<PokeThread[]> | PokeThread[];
 
   /** Persist a brand-new thread (it already has its id and first message). */
   createThread(thread: PokeThread): Promise<void> | void;
