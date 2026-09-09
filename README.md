@@ -81,6 +81,141 @@ init();
 Nothing else to install — Preact is bundled in, and Poke renders into its own
 Shadow DOM, so it won't touch your app's React/Preact/styles.
 
+`init()` returns a handle: `{ store, identity, mount, unmount, destroy }`. Call
+`destroy()` on teardown (framework unmount, HMR).
+
+### Framework setup
+
+Poke touches `window`/`document`, so it must run in the browser only. Runnable
+versions of each of these are in [`examples/frameworks/`](examples/frameworks/).
+
+<details>
+<summary><b>Vanilla / plain HTML</b></summary>
+
+```html
+<script type="module">
+  import { init } from "https://unpkg.com/@appliftlabs/poke/dist/index.js";
+  init({ pageId: location.pathname });
+</script>
+```
+
+or the no-bundler script tag:
+
+```html
+<script
+  src="https://unpkg.com/@appliftlabs/poke/dist/poke.global.js"
+  data-poke-user-id="u_12"
+  data-poke-user-name="Ada Lovelace"
+></script>
+```
+</details>
+
+<details>
+<summary><b>React</b> (Vite, CRA, etc.)</summary>
+
+```tsx
+// Poke.tsx
+import { useEffect } from "react";
+
+export function Poke() {
+  useEffect(() => {
+    let poke: { destroy(): void } | undefined;
+    import("@appliftlabs/poke").then(({ init, HttpAdapter }) => {
+      poke = init({
+        pageId: window.location.pathname,
+        adapter: new HttpAdapter({ baseUrl: import.meta.env.VITE_POKE_URL }),
+      });
+    });
+    return () => poke?.destroy();
+  }, []);
+  return null;
+}
+```
+
+Render `<Poke />` once, near the root (in `App`).
+</details>
+
+<details>
+<summary><b>Next.js</b></summary>
+
+**App Router** — `app/layout.tsx` is a Server Component, so use a client child:
+
+```tsx
+// app/poke.tsx
+"use client";
+import { useEffect } from "react";
+
+export function Poke() {
+  useEffect(() => {
+    let poke: { destroy(): void } | undefined;
+    import("@appliftlabs/poke").then(({ init, HttpAdapter }) => {
+      poke = init({
+        pageId: window.location.pathname,
+        adapter: new HttpAdapter({ baseUrl: process.env.NEXT_PUBLIC_POKE_URL! }),
+      });
+    });
+    return () => poke?.destroy();
+  }, []);
+  return null;
+}
+```
+
+```tsx
+// app/layout.tsx
+import { Poke } from "./poke";
+export default function RootLayout({ children }) {
+  return (
+    <html><body>{children}<Poke /></body></html>
+  );
+}
+```
+
+**Pages Router** — the same `useEffect` block in `pages/_app.tsx`.
+
+The dynamic `import()` inside `useEffect` keeps Poke out of the server bundle.
+</details>
+
+<details>
+<summary><b>Vue 3</b></summary>
+
+```ts
+// main.ts, after createApp(...).mount(...)
+import("@appliftlabs/poke").then(({ init, HttpAdapter }) => {
+  init({
+    pageId: window.location.pathname,
+    adapter: new HttpAdapter({ baseUrl: import.meta.env.VITE_POKE_URL }),
+  });
+});
+```
+
+or as a component with `onMounted` / `onUnmounted` calling `init()` / `destroy()`.
+</details>
+
+<details>
+<summary><b>Svelte / SvelteKit</b></summary>
+
+```svelte
+<!-- +layout.svelte -->
+<script>
+  import { onMount } from "svelte";
+  onMount(() => {
+    let poke;
+    import("@appliftlabs/poke").then(({ init, HttpAdapter }) => {
+      poke = init({
+        pageId: location.pathname,
+        adapter: new HttpAdapter({ baseUrl: import.meta.env.VITE_POKE_URL }),
+      });
+    });
+    return () => poke?.destroy();
+  });
+</script>
+```
+</details>
+
+**Client-side routing:** `pageId` is read once at `init()`. To re-scope comments
+when the route changes, call `poke.destroy()` then `init()` again with the new
+`pageId` — hook it to your router's navigation event.
+
 ### Identity
 
 | You pass | Author of comments | Name prompt |

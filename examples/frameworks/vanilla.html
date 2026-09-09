@@ -1,0 +1,38 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Poke — vanilla HTML</title>
+  </head>
+  <body>
+    <h1>Any page</h1>
+    <p>Poke works on plain HTML with no build step. Two ways:</p>
+
+    <!-- Option A: ES module import from a CDN -->
+    <script type="module">
+      import { init, HttpAdapter } from "https://unpkg.com/@appliftlabs/poke/dist/index.js";
+
+      init({
+        // Omit `user` → Poke prompts for a name on first comment and remembers it.
+        // Pass `{ id, name }` if your page already knows who's here.
+        pageId: location.pathname,
+
+        // Drop this line to use localStorage (single browser, no server).
+        adapter: new HttpAdapter({ baseUrl: "https://your-poke-server.example.com" }),
+      });
+    </script>
+
+    <!--
+      Option B: the script-tag build (bundles everything, config via data-* attrs).
+      Use this OR option A, not both.
+
+      <script
+        src="https://unpkg.com/@appliftlabs/poke/dist/poke.global.js"
+        data-poke-user-id="u_12"
+        data-poke-user-name="Ada Lovelace"
+        data-poke-page-id="/checkout"
+      ></script>
+    -->
+  </body>
+</html>
