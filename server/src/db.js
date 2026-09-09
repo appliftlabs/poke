@@ -14,18 +14,28 @@ if (!connectionString) {
   process.exit(1);
 }
 
+/**
+ * SSL decision:
+ *   PGSSL=1        force on
+ *   PGSSL=0        force off
+ *   (unset)        off for localhost AND for Railway/Fly internal hostnames
+ *                  (private-network connections there are plain TCP), on for
+ *                  everything else (managed Postgres over the public internet).
+ */
+function resolveSsl(conn) {
+  if (process.env.PGSSL === "1") return { rejectUnauthorized: false };
+  if (process.env.PGSSL === "0") return false;
+  const isLocal = /@(localhost|127\.0\.0\.1|\[::1\]|::1)[:/]/.test(conn);
+  const isPrivate = /@[^/@]*\.(railway\.internal|internal|flycast)[:/]/.test(conn);
+  return isLocal || isPrivate ? false : { rejectUnauthorized: false };
+}
+
 export const pool = new Pool({
   connectionString,
-  // Most managed Postgres (Railway, Fly, Render, Supabase, Neon) needs SSL.
-  // Local dev usually doesn't. Toggle with PGSSL=1 / PGSSL=0, default: on unless
-  // the host is localhost.
-  ssl:
-    process.env.PGSSL === "0"
-      ? false
-      : process.env.PGSSL === "1" ||
-          !/@(localhost|127\.0\.0\.1|::1)[:/]/.test(connectionString)
-        ? { rejectUnauthorized: false }
-        : false,
+  ssl: resolveSsl(connectionString),
+  // Give each connection attempt a bounded timeout so a network blip surfaces
+  // as a retryable error rather than hanging.
+  connectionTimeoutMillis: 10_000,
 });
 
 pool.on("error", (err) => {
@@ -59,8 +69,40 @@ export const SCHEMA = /* sql */ `
     ON poke_messages (thread_id, created_at);
 `;
 
-export async function ensureSchema() {
-  await pool.query(SCHEMA);
+const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
+
+/**
+ * Run the schema DDL, retrying the first connection.
+ *
+ * On some hosts (Railway private networking, in particular) the database's
+ * internal DNS / network isn't reachable for the first second or two after the
+ * container starts. Without this the process would crash-loop on boot.
+ */
+export async function ensureSchema({ retries = 10, delayMs = 1500 } = {}) {
+  let lastErr;
+  for (let attempt = 1; attempt <= retries; attempt++) {
+    try {
+      await pool.query(SCHEMA);
+      if (attempt > 1) {
+        console.log(`[poke-server] database reachable after ${attempt} attempts`);
+      }
+      return;
+    } catch (err) {
+      lastErr = err;
+      const transient =
+        err.code === "ECONNREFUSED" ||
+        err.code === "ENOTFOUND" ||
+        err.code === "EAI_AGAIN" ||
+        err.code === "ETIMEDOUT" ||
+        err.code === "57P03"; // cannot_connect_now / starting up
+      if (!transient || attempt === retries) break;
+      console.log(
+        `[poke-server] database not ready (${err.code}), retry ${attempt}/${retries} in ${delayMs}ms`,
+      );
+      await sleep(delayMs);
+    }
+  }
+  throw lastErr;
 }
 
 /** Shape a thread row (+ its messages) into the JSON the client expects. */

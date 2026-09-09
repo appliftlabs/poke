@@ -90,6 +90,17 @@ railway domain                     # get the public URL
 Postgres plugin automatically; you only set `POKE_ORIGINS` (and optionally
 `POKE_PROJECT`).
 
+Notes:
+
+- Use the Postgres service's **private** `DATABASE_URL`
+  (`...@postgres.railway.internal:5432/railway`). The server auto-disables SSL
+  for `*.railway.internal` hosts (private connections are plain TCP) and retries
+  the first connection while Railway's private network comes up — no config
+  needed.
+- If the CLI is linked to the **Postgres** service, `railway up` /
+  `railway variables` act on the wrong service. Run
+  `railway service poke-server` first (or pass `--service poke-server`).
+
 ### Fly.io
 
 ```bash
