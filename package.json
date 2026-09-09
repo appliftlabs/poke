@@ -1,6 +1,6 @@
 {
   "name": "@appliftlabs/poke",
-  "version": "0.2.0",
+  "version": "0.3.0",
   "description": "Figma-style pinned comments for any live web page. Drop-in, element-anchored, open source.",
   "license": "MIT",
   "author": "Applift Labs",
