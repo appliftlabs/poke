@@ -16,18 +16,19 @@ if (!connectionString) {
 
 /**
  * SSL decision:
- *   PGSSL=1        force on
+ *   PGSSL=1        force on   (accept self-signed — managed PG uses its own CA)
  *   PGSSL=0        force off
- *   (unset)        off for localhost AND for Railway/Fly internal hostnames
- *                  (private-network connections there are plain TCP), on for
- *                  everything else (managed Postgres over the public internet).
+ *   (unset)        off only for localhost / 127.0.0.1 / ::1; on everywhere else.
+ *
+ * Note: Railway's `postgres-ssl` image requires SSL even over the private
+ * network, so "internal hostname" is NOT a reason to disable it. If your PG
+ * genuinely doesn't do SSL, set PGSSL=0.
  */
 function resolveSsl(conn) {
   if (process.env.PGSSL === "1") return { rejectUnauthorized: false };
   if (process.env.PGSSL === "0") return false;
   const isLocal = /@(localhost|127\.0\.0\.1|\[::1\]|::1)[:/]/.test(conn);
-  const isPrivate = /@[^/@]*\.(railway\.internal|internal|flycast)[:/]/.test(conn);
-  return isLocal || isPrivate ? false : { rejectUnauthorized: false };
+  return isLocal ? false : { rejectUnauthorized: false };
 }
 
 export const pool = new Pool({
