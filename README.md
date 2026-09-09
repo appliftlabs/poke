@@ -68,14 +68,16 @@ npm install @appliftlabs/poke
 ```js
 import { init } from "@appliftlabs/poke";
 
-// App with accounts — tell Poke who's here:
-init({ user: { id: currentUser.id, name: currentUser.name } });
+init({
+  // Keep Poke out of production. Anything other than a truthy/dev-ish value
+  // makes init() a complete no-op — no UI, no network. See "Environments".
+  enabled: process.env.NODE_ENV !== "production",
 
-// Shared review link, no accounts — omit `user`. Poke asks for a name the
-// first time someone comments and remembers it in that browser:
-init();
+  // App with accounts — tell Poke who's here. Omit for a name prompt.
+  user: { id: currentUser.id, name: currentUser.name },
 
-// (no `adapter` → localStorage. Pass `adapter` to sync your own backend.)
+  // No adapter → localStorage (one browser). Pass one to sync a backend.
+});
 ```
 
 Nothing else to install — Preact is bundled in, and Poke renders into its own
@@ -83,6 +85,29 @@ Shadow DOM, so it won't touch your app's React/Preact/styles.
 
 `init()` returns a handle: `{ store, identity, mount, unmount, destroy }`. Call
 `destroy()` on teardown (framework unmount, HMR).
+
+### Environments — keeping Poke out of production
+
+Poke is a review tool. It should not reach real users. Pass `enabled` so a
+misconfigured deploy fails safe:
+
+```js
+init({ enabled: process.env.NODE_ENV !== "production" });  // Node / Next
+init({ enabled: import.meta.env.DEV });                     // Vite
+init({ enabled: process.env.NEXT_PUBLIC_POKE === "on" });   // explicit flag
+init({ enabled: () => featureFlags.poke });                 // function, called at init
+```
+
+| `enabled` value | Result |
+|---|---|
+| omitted | **runs** (default) |
+| `true`, `"development"`, `"dev"`, `"staging"`, `"test"`, `"preview"`, `"local"` | runs |
+| `false`, `"production"`, or **anything else** | inert: no UI, no adapter, no network; `init()` still returns a valid no-op instance |
+
+When disabled, Poke also removes any overlay a previous enabled `init()` left on
+the page (e.g. after an env flag flips during HMR). Belt and braces: for the
+script-tag build, the surest way is to only render the `<script>` element
+server-side when you're not in production.
 
 ### Framework setup
 

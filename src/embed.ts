@@ -7,11 +7,17 @@
  *     data-poke-user-name="Ada Lovelace"
  *     data-poke-page-id="/checkout"          // optional
  *     data-poke-auto="true"                   // optional, default true
+ *     data-poke-enabled="development"          // optional — see below
  *   ></script>
  *
  * Reads config from the tag's data-* attributes and calls init(). When the user
  * id/name aren't on the tag, it does nothing but expose `window.Poke.init` so
  * the host can start it manually once identity is known (e.g. after login).
+ *
+ * `data-poke-enabled`: "true" / "development" / "staging" / "test" / "preview"
+ * run Poke; "false" / "production" / anything else make it a no-op. Omit to
+ * default on. The safest way to keep Poke out of production with a script tag is
+ * to only render the <script> element server-side when not in production.
  */
 import { init, type PokeInstance } from "./poke.js";
 import { LocalStorageAdapter } from "./adapters/local-storage.js";
@@ -46,6 +52,7 @@ function boot(): PokeInstance | null {
       ...(d.pokeUserColor ? { color: d.pokeUserColor } : {}),
     },
     ...(d.pokePageId ? { pageId: d.pokePageId } : {}),
+    ...(d.pokeEnabled !== undefined ? { enabled: d.pokeEnabled } : {}),
   });
 }
 

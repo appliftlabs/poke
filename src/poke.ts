@@ -58,6 +58,28 @@ export interface PokeConfig {
 
   /** Start with the UI mounted. Default true. */
   autoMount?: boolean;
+
+  /**
+   * Whether Poke should run at all.
+   *
+   * Poke is a *build-time* tool for review environments — it should not ship to
+   * real users. Pass this so a misconfigured deploy fails safe:
+   *
+   *   - `true`  / `"development"` / `"staging"` / `"test"` / `"preview"` → runs
+   *   - `false` / `"production"` / anything else → Poke does nothing:
+   *       no UI, no adapter connection, no network. `init()` still returns a
+   *       valid (inert) instance so your calling code doesn't need a guard.
+   *
+   * A function is called at init time — handy for `() => import.meta.env.DEV`
+   * or a feature flag.
+   *
+   * Default: **enabled**. Set this explicitly. The recommended pattern:
+   *
+   *   init({ enabled: process.env.NODE_ENV !== "production", ... })
+   *   init({ enabled: import.meta.env.DEV, ... })            // Vite
+   *   init({ enabled: process.env.NEXT_PUBLIC_POKE === "on", ... })
+   */
+  enabled?: boolean | string | (() => boolean | string);
 }
 
 export interface PokeInstance {
@@ -87,7 +109,81 @@ function isCompleteUser(u: PokeConfig["user"]): u is PokeUser {
   );
 }
 
+/** Values of `enabled` that mean "run". Everything else (incl. "production") is off. */
+const ENABLED_VALUES = new Set([
+  "development",
+  "dev",
+  "staging",
+  "test",
+  "preview",
+  "local",
+]);
+
+function resolveEnabled(v: PokeConfig["enabled"]): boolean {
+  const value = typeof v === "function" ? safeCall(v) : v;
+  if (value === undefined) return true; // default on
+  if (typeof value === "boolean") return value;
+  if (typeof value === "string") return ENABLED_VALUES.has(value.toLowerCase());
+  return false;
+}
+
+function safeCall(fn: () => boolean | string): boolean | string {
+  try {
+    return fn();
+  } catch {
+    return false; // a throwing predicate fails safe (off)
+  }
+}
+
+/**
+ * A storage adapter that holds nothing and does nothing. Used when Poke is
+ * disabled so `poke.store` is still a real object but touches no storage and
+ * makes no network calls. Writes are silently dropped — a disabled instance
+ * should never throw or surface UI.
+ */
+const NULL_ADAPTER: StorageAdapter = {
+  listThreads: () => [],
+  listAllThreads: () => [],
+  createThread: () => {},
+  addMessage: () => ({
+    id: "",
+    threadId: "",
+    author: { id: "poke-disabled", name: "" },
+    body: "",
+    createdAt: 0,
+  }),
+  updateThread: () => {},
+  updateMessage: () => {},
+  deleteThread: () => {},
+};
+
+/** An inert instance for when Poke is disabled — every method is a no-op. */
+function disabledInstance(): PokeInstance {
+  const noop = () => {};
+  return {
+    store: new CommentStore({
+      adapter: NULL_ADAPTER,
+      pageId: "disabled",
+      user: { id: "poke-disabled", name: "" },
+    }),
+    identity: null,
+    mount: noop,
+    unmount: noop,
+    destroy: async () => {},
+  };
+}
+
 export function init(config: PokeConfig = {}): PokeInstance {
+  if (!resolveEnabled(config.enabled)) {
+    // Fail safe: no UI, no adapter, no network. Also clear any overlay a
+    // previous (enabled) init on this page left behind — e.g. after a
+    // config change / HMR.
+    if (typeof document !== "undefined") {
+      document.getElementById("poke-overlay-host")?.remove();
+    }
+    return disabledInstance();
+  }
+
   const pageId =
     config.pageId ??
     (typeof location !== "undefined" ? location.pathname : "default");

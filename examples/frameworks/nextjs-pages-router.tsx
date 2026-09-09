@@ -22,11 +22,13 @@ export default function App({ Component, pageProps }: AppProps) {
     import("@appliftlabs/poke").then(({ init, HttpAdapter }) => {
       if (cancelled) return;
       instance = init({
+        enabled: process.env.NODE_ENV !== "production",
         // user: { id: session.user.id, name: session.user.name },
         pageId: router.pathname,
         adapter: new HttpAdapter({
           baseUrl: process.env.NEXT_PUBLIC_POKE_URL!,
         }),
+        onNavigate: (pageId) => router.push(pageId),
       });
     });
 

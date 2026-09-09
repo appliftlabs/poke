@@ -19,6 +19,7 @@
     poke?.destroy();
     import("@appliftlabs/poke").then(({ init, HttpAdapter }) => {
       poke = init({
+        enabled: import.meta.env.DEV, // never in a production build
         // user: { id: data.user.id, name: data.user.name },
         pageId: currentPage,
         adapter: new HttpAdapter({ baseUrl: import.meta.env.VITE_POKE_URL }),

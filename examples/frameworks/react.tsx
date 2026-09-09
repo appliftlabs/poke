@@ -38,6 +38,7 @@ export function Poke({ user }: PokeProps) {
     import("@appliftlabs/poke").then(({ init, HttpAdapter }) => {
       if (cancelled) return;
       instance = init({
+        enabled: import.meta.env.DEV, // never in a production build
         ...(user ? { user } : {}),
         pageId: pathname,
         adapter: new HttpAdapter({

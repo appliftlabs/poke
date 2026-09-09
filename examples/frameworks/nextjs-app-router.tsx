@@ -38,6 +38,8 @@ export function Poke() {
     import("@appliftlabs/poke").then(({ init, HttpAdapter }) => {
       if (cancelled) return;
       instance = init({
+        // Never ship Poke to production users.
+        enabled: process.env.NODE_ENV !== "production",
         // pass a real user here if the app has auth:
         // user: { id: session.user.id, name: session.user.name },
         pageId: pathname,

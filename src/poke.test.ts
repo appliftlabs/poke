@@ -76,4 +76,92 @@ describe("init", () => {
 
     await poke.destroy();
   });
+
+  describe("enabled gate", () => {
+    it("runs by default (enabled omitted)", async () => {
+      const poke = init({ user: { id: "u1", name: "Ada" }, pageId: "p1" });
+      await poke.store.start();
+      poke.mount();
+      expect(document.getElementById("poke-overlay-host")).not.toBeNull();
+      await poke.destroy();
+    });
+
+    for (const val of ["production", false, "prod", "anything-else", "PRODUCTION"] as const) {
+      it(`is inert when enabled=${JSON.stringify(val)}`, () => {
+        const poke = init({
+          user: { id: "u1", name: "Ada" },
+          pageId: "p1",
+          enabled: val,
+        });
+        poke.mount(); // no-op
+        expect(document.getElementById("poke-overlay-host")).toBeNull();
+        expect(poke.identity).toBeNull();
+        // store exists but is inert
+        expect(poke.store.list()).toEqual([]);
+      });
+    }
+
+    for (const val of ["development", "dev", "staging", "test", "preview", true] as const) {
+      it(`runs when enabled=${JSON.stringify(val)}`, async () => {
+        const poke = init({
+          user: { id: "u1", name: "Ada" },
+          pageId: "p1",
+          enabled: val,
+        });
+        await poke.store.start();
+        poke.mount();
+        expect(document.getElementById("poke-overlay-host")).not.toBeNull();
+        await poke.destroy();
+      });
+    }
+
+    it("accepts a function predicate", () => {
+      const off = init({ user: { id: "u1", name: "Ada" }, enabled: () => false });
+      off.mount();
+      expect(document.getElementById("poke-overlay-host")).toBeNull();
+
+      const on = init({
+        user: { id: "u1", name: "Ada" },
+        pageId: "p1",
+        enabled: () => "development",
+      });
+      on.mount();
+      expect(document.getElementById("poke-overlay-host")).not.toBeNull();
+      on.destroy();
+    });
+
+    it("a throwing predicate fails safe (off)", () => {
+      const poke = init({
+        user: { id: "u1", name: "Ada" },
+        enabled: () => {
+          throw new Error("flag service down");
+        },
+      });
+      poke.mount();
+      expect(document.getElementById("poke-overlay-host")).toBeNull();
+    });
+
+    it("tears down an overlay left by a previous enabled init", async () => {
+      const live = init({ user: { id: "u1", name: "Ada" }, pageId: "p1" });
+      await live.store.start();
+      live.mount();
+      expect(document.getElementById("poke-overlay-host")).not.toBeNull();
+
+      // Re-init disabled (e.g. env flag flipped, HMR) — should remove the overlay.
+      init({ user: { id: "u1", name: "Ada" }, pageId: "p1", enabled: false });
+      expect(document.getElementById("poke-overlay-host")).toBeNull();
+    });
+
+    it("store writes while disabled are silently dropped, not thrown", async () => {
+      const poke = init({ user: { id: "u1", name: "Ada" }, enabled: false });
+      const { captureAnchor } = await import("./anchor/index.js");
+      const el = document.querySelector<HTMLElement>("button")!;
+      // Should not throw, and should not persist anything.
+      await poke.store.createThread({
+        anchor: captureAnchor(el, { clientX: 0, clientY: 0 }),
+        body: "x",
+      });
+      expect(poke.store.list()).toEqual([]);
+    });
+  });
 });

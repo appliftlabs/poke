@@ -12,6 +12,7 @@ export async function startPoke(pageId = window.location.pathname) {
   const { init, HttpAdapter } = await import("@appliftlabs/poke");
   instance?.destroy();
   instance = init({
+    enabled: import.meta.env.DEV, // never in a production build
     // user: { id: user.id, name: user.name },
     pageId,
     adapter: new HttpAdapter({ baseUrl: import.meta.env.VITE_POKE_URL }),
