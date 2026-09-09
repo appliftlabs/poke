@@ -29,13 +29,35 @@ Early but usable. Working today:
 - **Identity** — pass a `user` if your app has accounts; otherwise Poke asks for
   a name the first time someone comments and remembers it in that browser. The
   name shows next to their comments for everyone.
-- **Storage** — storage-agnostic core with two bundled adapters:
-  `LocalStorageAdapter` (zero infra, single browser) and `HttpAdapter`
-  (persists to any REST backend, with SSE realtime for multi-user). A small
-  Postgres-backed reference server lives in [`server/`](server/). Or implement
-  `StorageAdapter` against Firebase, Supabase, your own API.
+- **Storage** — `localStorage` by default (single browser), or a real backend
+  for multi-user: a bundled `HttpAdapter` + the Postgres server in
+  [`server/`](server/), or your own `StorageAdapter`. See
+  [How it works](#how-it-works--the-two-pieces).
 
-Next: keyboard nav, screenshots attached to comments.
+Next: keyboard nav, screenshots attached to comments, a one-click server deploy.
+
+## How it works — the two pieces
+
+Poke has a **client library** and (for teams) a **backend**.
+
+1. **`@appliftlabs/poke`** — the client. A script in the browser: the pins, the
+   comment UI, the element-anchoring. You add this to your app. This is all you
+   need if comments only have to persist in *one* person's browser (solo review,
+   a quick demo) — it uses `localStorage` by default, no backend.
+
+2. **A backend** — needed the moment *two people* need to see each other's
+   comments, because the browser can't (and shouldn't) talk to a database
+   directly. The client sends comments to a small server over HTTP; the server
+   owns the database and pushes changes to everyone viewing the page.
+
+   Poke ships one: [`server/`](server/) — Postgres-backed, ~350 lines, one
+   dependency. **You run your own copy** (Railway, Fly, Docker, a VPS — see
+   [`server/README.md`](server/README.md)). Every team self-hosts their own; there
+   is no shared "Poke" service. Or write a
+   [`StorageAdapter`](#writing-a-custom-adapter-supabase-firebase-your-own-api)
+   against Supabase, Firebase, or your existing API instead.
+
+So: **client always. Backend once, when you go multi-user.**
 
 ## Quick start
 
@@ -84,35 +106,40 @@ Or the script tag, no build step at all:
 ></script>
 ```
 
-### Persisting to a database
+### Going multi-user
 
-Use `HttpAdapter` against a backend that speaks Poke's small REST contract:
-
-```ts
-import { init, HttpAdapter } from "@appliftlabs/poke";
-
-init({
-  user: { id: me.id, name: me.name },
-  adapter: new HttpAdapter({
-    baseUrl: "https://api.example.com/poke",
-    headers: () => ({ Authorization: `Bearer ${getToken()}` }),
-    // realtime is automatic if the backend exposes an SSE stream at
-    // {baseUrl}/pages/:pageId/events — pass `sseUrl: null` to opt out
-  }),
-});
-```
-
-There's a Postgres-backed reference backend in [`server/`](server/) with SSE
-realtime — deploy it as-is for a trusted audience, or fork it to add auth:
+**1. Run the backend.** Deploy your own copy of [`server/`](server/) —
+full instructions (Railway, Fly, Docker, plain Node) are in
+[`server/README.md`](server/README.md). Locally it's:
 
 ```bash
 cd server && npm install
 docker compose up -d                    # or bring your own Postgres
 DATABASE_URL=postgres://poke:poke@localhost:5432/poke npm run migrate
-node --env-file=.env src/server.js       # :4000
+node --env-file=.env src/server.js       # http://localhost:4000
 ```
 
-The REST contract it implements:
+**2. Point the client at it** with `HttpAdapter`:
+
+```ts
+import { init, HttpAdapter } from "@appliftlabs/poke";
+
+init({
+  user: { id: me.id, name: me.name },     // or omit for the name prompt
+  adapter: new HttpAdapter({
+    baseUrl: "https://your-poke-server.example.com",
+    headers: () => ({ Authorization: `Bearer ${getToken()}` }), // if your server checks auth
+    // realtime is automatic — the adapter subscribes to the SSE stream at
+    // {baseUrl}/pages/:pageId/events. Pass `sseUrl: null` to disable.
+  }),
+});
+```
+
+That's it — pins now sync live for everyone on the page.
+
+<details>
+<summary>The REST contract <code>server/</code> implements (for a custom backend)</summary>
+
 
 | Method | Path | Body | Returns |
 |---|---|---|---|
@@ -124,9 +151,12 @@ The REST contract it implements:
 | `DELETE` | `/threads/:id` | — | `204` |
 | `GET` | `/pages/:pageId/events` | — | SSE stream (optional) |
 
-### Writing a fully custom adapter
+</details>
 
-Implement the six methods (all may be async) plus an optional `subscribe()`:
+### Writing a custom adapter (Supabase, Firebase, your own API)
+
+Instead of running `server/`, implement `StorageAdapter` — the six methods (all
+may be async) plus an optional `subscribe()` for realtime:
 
 ```ts
 import type { StorageAdapter } from "@appliftlabs/poke";

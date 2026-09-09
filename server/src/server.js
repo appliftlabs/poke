@@ -32,21 +32,17 @@
 import { createServer } from "node:http";
 import { randomUUID } from "node:crypto";
 import { ensureSchema, hydrateMessage, hydrateThread, pool } from "./db.js";
+import { buildOriginRules, matchOrigin } from "./cors.js";
 
 const PORT = Number(process.env.PORT || 4000);
 const PROJECT = process.env.POKE_PROJECT || "default";
 const MAX_BODY = Number(process.env.POKE_MAX_BODY || 100_000);
-const ORIGINS = (process.env.POKE_ORIGINS || "*")
-  .split(",")
-  .map((s) => s.trim())
-  .filter(Boolean);
+const ORIGIN_RULES = buildOriginRules(process.env.POKE_ORIGINS);
 
 // --- CORS ----------------------------------------------------------------
 
 function corsHeaders(req) {
-  const origin = req.headers.origin;
-  const allow =
-    ORIGINS.includes("*") ? "*" : origin && ORIGINS.includes(origin) ? origin : "";
+  const allow = matchOrigin(ORIGIN_RULES, req.headers.origin);
   const h = {
     "Access-Control-Allow-Methods": "GET,POST,PATCH,DELETE,OPTIONS",
     "Access-Control-Allow-Headers": "Content-Type, Authorization",
@@ -397,7 +393,7 @@ await ensureSchema();
 server.listen(PORT, () => {
   console.log(`[poke-server] listening on :${PORT}`);
   console.log(`  project: ${PROJECT}`);
-  console.log(`  CORS:    ${ORIGINS.join(", ")}`);
+  console.log(`  CORS:    ${process.env.POKE_ORIGINS || "*"}`);
 });
 
 for (const sig of ["SIGINT", "SIGTERM"]) {

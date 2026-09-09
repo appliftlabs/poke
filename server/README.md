@@ -46,10 +46,26 @@ reloads on any change.
 |---|---|---|
 | `DATABASE_URL` | — (required) | `postgres://user:pass@host:5432/poke` |
 | `PORT` | `4000` | |
-| `POKE_ORIGINS` | `*` | Comma-separated allowed browser origins. Set this. |
+| `POKE_ORIGINS` | `*` | Allowed browser origins (see below). Set this. |
 | `POKE_PROJECT` | `default` | Namespace for this deployment's comments |
 | `POKE_MAX_BODY` | `100000` | Max request body bytes |
 | `PGSSL` | auto | `1` force on, `0` off. On by default unless host is localhost. |
+
+### `POKE_ORIGINS`
+
+Comma-separated. Each entry is one of:
+
+| Entry | Matches |
+|---|---|
+| `*` | any origin — only for internal / trusted-network use |
+| `https://app.example.com` | that exact origin |
+| `https://*.example.com` | any single-label subdomain (`a.example.com`, not `a.b.example.com`); the scheme must match too |
+
+Include scheme and port. For a multi-tenant app with per-customer subdomains:
+
+```
+POKE_ORIGINS=https://app.modools.app,https://*.modools.app
+```
 
 ## Deploying
 
@@ -65,7 +81,7 @@ railway login
 cd server
 railway init                       # create a project
 railway add --database postgres    # provisions Postgres, injects DATABASE_URL
-railway variables --set POKE_ORIGINS=https://your-app.com --set POKE_PROJECT=modools
+railway variables --set 'POKE_ORIGINS=https://your-app.com' --set 'POKE_PROJECT=your-app'
 railway up                         # builds the Dockerfile, deploys
 railway domain                     # get the public URL
 ```
