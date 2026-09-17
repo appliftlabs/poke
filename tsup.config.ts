@@ -40,4 +40,21 @@ export default defineConfig([
       Object.assign(o, esbuildJsx);
     },
   },
+  // Server build: @appliftlabs/poke/server, /next-js, /node.
+  //
+  // Node-only, no Preact/DOM. `pg` and Node builtins stay external — this runs
+  // in the host's own server, which brings its own `pg` (peer dependency).
+  {
+    entry: {
+      server: "src/server/index.ts",
+      "next-js": "src/server/integrations/next-js.ts",
+      node: "src/server/integrations/node.ts",
+    },
+    format: ["esm", "cjs"],
+    platform: "node",
+    dts: true,
+    sourcemap: true,
+    treeshake: true,
+    external: ["pg"],
+  },
 ]);

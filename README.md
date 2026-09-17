@@ -331,8 +331,70 @@ Or the script tag, no build step at all:
 
 ### Going multi-user
 
-**1. Run the backend.** Deploy your own copy of [`server/`](https://github.com/yusuf-ishaku/poke/tree/main/server) —
-full instructions (Railway, Fly, Docker, plain Node) are in
+**1. Run the backend — pick one:**
+
+**Option A: inside your own app (recommended for Node/Next.js apps).** No
+separate deploy, no second database — Poke's API is a route your app already
+serves, sharing your Postgres and your auth. This is the `@appliftlabs/poke/server`
+export, structured the way [better-auth](https://better-auth.com) does its
+handler: one config call, mounted with a framework-specific one-liner.
+
+```ts
+// app/api/poke/[...poke]/route.ts  (Next.js App Router)
+import { createPoke } from "@appliftlabs/poke/server";
+import { toNextJsHandler } from "@appliftlabs/poke/next-js";
+import { Pool } from "pg";
+
+const poke = createPoke({
+  database: new Pool({ connectionString: process.env.DATABASE_URL }),
+  // Derive the author from your own session — the right way to do auth here.
+  // Omit `getUser` (or set `allowAnonymous: true`) to trust the client's own
+  // identity instead, for a trusted/internal audience.
+  getUser: async () => {
+    const session = await auth();
+    return session && { id: session.user.id, name: session.user.name };
+  },
+});
+
+export const { GET, POST, PATCH, DELETE } = toNextJsHandler(poke.handler);
+```
+
+Plain Node / Express — same `createPoke()`, a different one-liner to mount it:
+
+```ts
+import { createServer } from "node:http";
+import { createPoke } from "@appliftlabs/poke/server";
+import { toNodeHandler } from "@appliftlabs/poke/node";
+import { Pool } from "pg";
+
+const poke = createPoke({ database: new Pool({ connectionString: process.env.DATABASE_URL }) });
+createServer(toNodeHandler(poke.handler)).listen(4000);
+```
+
+`createPoke` needs `pg` (`npm i pg`) — it's a peer dependency, not bundled, so
+your app brings its own driver, same as `betterAuth({ database: pool })`. The
+schema (`poke_threads` / `poke_messages`) is created automatically on first
+request; no separate migration step.
+
+<details>
+<summary><b>Realtime & deployment</b> — SSE, serverless, and what "works everywhere" actually means</summary>
+
+The live-update stream is genuinely in-process: a write in one server instance
+notifies subscribers connected to *that same instance*. That's exactly right
+for a long-lived Node process (one instance, every request). On serverless/edge
+platforms that spin up many short-lived instances, two viewers hitting
+different instances won't see each other's comments appear live over SSE —
+though every read still goes to the same database, so the truth is never wrong,
+just not always pushed instantly. Set `realtime: false` to skip the SSE route
+entirely on a platform where long connections don't work, and viewers will pick
+up changes on their next navigation/refresh instead.
+
+</details>
+
+**Option B: a standalone deploy**, for non-Node backends or when you'd rather
+keep it isolated from your app entirely. Deploy your own copy of
+[`server/`](https://github.com/yusuf-ishaku/poke/tree/main/server) — full
+instructions (Railway, Fly, Docker, plain Node) are in
 [`server/README.md`](https://github.com/yusuf-ishaku/poke/blob/main/server/README.md). Locally it's:
 
 ```bash
@@ -342,7 +404,8 @@ DATABASE_URL=postgres://poke:poke@localhost:5432/poke npm run migrate
 node --env-file=.env src/server.js       # http://localhost:4000
 ```
 
-**2. Point the client at it** with `HttpAdapter`:
+**2. Point the client at it** with `HttpAdapter` — same for either option
+above, just change `baseUrl`:
 
 ```ts
 import { init, HttpAdapter } from "@appliftlabs/poke";
@@ -350,7 +413,8 @@ import { init, HttpAdapter } from "@appliftlabs/poke";
 init({
   user: { id: me.id, name: me.name },     // or omit for the name prompt
   adapter: new HttpAdapter({
-    baseUrl: "https://your-poke-server.example.com",
+    baseUrl: "/api/poke",                 // Option A: mounted in your own app
+    // baseUrl: "https://your-poke-server.example.com",  // Option B: standalone
     headers: () => ({ Authorization: `Bearer ${getToken()}` }), // if your server checks auth
     // realtime is automatic — the adapter subscribes to the SSE stream at
     // {baseUrl}/pages/:pageId/events. Pass `sseUrl: null` to disable.
@@ -361,7 +425,7 @@ init({
 That's it — pins now sync live for everyone on the page.
 
 <details>
-<summary>The REST contract <code>server/</code> implements (for a custom backend)</summary>
+<summary>The REST contract — implemented by both <code>@appliftlabs/poke/server</code> and <code>server/</code> (for a custom backend)</summary>
 
 
 | Method | Path | Body | Returns |

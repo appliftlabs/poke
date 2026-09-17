@@ -33,6 +33,21 @@
       "import": "./dist/index.js",
       "require": "./dist/index.cjs"
     },
+    "./server": {
+      "types": "./dist/server.d.ts",
+      "import": "./dist/server.js",
+      "require": "./dist/server.cjs"
+    },
+    "./next-js": {
+      "types": "./dist/next-js.d.ts",
+      "import": "./dist/next-js.js",
+      "require": "./dist/next-js.cjs"
+    },
+    "./node": {
+      "types": "./dist/node.d.ts",
+      "import": "./dist/node.js",
+      "require": "./dist/node.cjs"
+    },
     "./global": "./dist/poke.global.js",
     "./package.json": "./package.json"
   },
@@ -46,6 +61,14 @@
   ],
   "engines": {
     "node": ">=18"
+  },
+  "peerDependencies": {
+    "pg": "^8.11.0"
+  },
+  "peerDependenciesMeta": {
+    "pg": {
+      "optional": true
+    }
   },
   "publishConfig": {
     "access": "public"
@@ -61,7 +84,9 @@
   },
   "devDependencies": {
     "@types/node": "^22.10.2",
+    "@types/pg": "^8.23.1",
     "jsdom": "^25.0.1",
+    "pg": "^8.23.0",
     "preact": "^10.25.3",
     "tsup": "^8.3.5",
     "typescript": "^5.7.2",
