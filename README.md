@@ -2,342 +2,20 @@
 
 **Figma-style pinned comments for any live web page.**
 
-Drop Poke into a site and anyone — a client, a teammate, a QA tester — can flip
-on comment mode, click the thing they're talking about, and leave a note pinned
-right there. Like leaving a comment on a Figma design, but on your actual running
-website.
-
-No more "the button, you know, the blue one, near the top" or screenshots with
-arrows scribbled on them. The note sits on the element.
-
-Poke is an open-source contribution from [Applift Labs](https://applift.xyz).
-It's the clean, developer-friendly, no-strings version of what paid tools like
-BugHerd and Marker.io do. MIT licensed, free for any team.
-
----
-
-## Status
-
-Early but usable. Working today:
-
-- **Anchoring engine** — pins stay on the right element across reloads and
-  layout changes (details below).
-- **Comment layer** — `Poke.init()` mounts an isolated overlay: comment mode
-  with a hover highlight, click-to-pin, threaded replies, resolve/reopen,
-  delete, and a sidebar listing every comment. Rendered with Preact inside a
-  Shadow DOM so it can't collide with the host page's styles or scripts.
-- **Identity** — pass a `user` if your app has accounts; otherwise Poke asks for
-  a name the first time someone comments and remembers it in that browser. The
-  name shows next to their comments for everyone.
-- **Storage** — `localStorage` by default (single browser), or a real backend
-  for multi-user: a bundled `HttpAdapter` + the Postgres server in
-  [`server/`](https://github.com/yusuf-ishaku/poke/tree/main/server), or your own `StorageAdapter`. See
-  [How it works](#how-it-works--the-two-pieces).
-
-Next: keyboard nav, screenshots attached to comments, a one-click server deploy.
-
-## How it works — the two pieces
-
-Poke has a **client library** and (for teams) a **backend**.
-
-1. **`@appliftlabs/poke`** — the client. A script in the browser: the pins, the
-   comment UI, the element-anchoring. You add this to your app. This is all you
-   need if comments only have to persist in *one* person's browser (solo review,
-   a quick demo) — it uses `localStorage` by default, no backend.
-
-2. **A backend** — needed the moment *two people* need to see each other's
-   comments, because the browser can't (and shouldn't) talk to a database
-   directly. The client sends comments to a small server over HTTP; the server
-   owns the database and pushes changes to everyone viewing the page.
-
-   Poke ships one: [`server/`](https://github.com/yusuf-ishaku/poke/tree/main/server) — Postgres-backed, ~350 lines, one
-   dependency. **You run your own copy** (Railway, Fly, Docker, a VPS — see
-   [`server/README.md`](https://github.com/yusuf-ishaku/poke/blob/main/server/README.md)). Every team self-hosts their own; there
-   is no shared "Poke" service. Or write a
-   [`StorageAdapter`](#writing-a-custom-adapter-supabase-firebase-your-own-api)
-   against Supabase, Firebase, or your existing API instead.
-
-So: **client always. Backend once, when you go multi-user.**
-
-## Quick start
+Click something, leave a note, it stays pinned to that exact element — even
+after the page reloads or the layout shifts. No more "the button, you know,
+the blue one, near the top." Open source, MIT licensed, from
+[Applift Labs](https://applift.xyz).
 
 ```bash
 npm install @appliftlabs/poke
 ```
 
-```js
-import { init } from "@appliftlabs/poke";
+## Quick start: comments backed by your own database
 
-init({
-  // Keep Poke out of production. Anything other than a truthy/dev-ish value
-  // makes init() a complete no-op — no UI, no network. See "Environments".
-  enabled: process.env.NODE_ENV !== "production",
-
-  // App with accounts — tell Poke who's here. Omit for a name prompt.
-  user: { id: currentUser.id, name: currentUser.name },
-
-  // No adapter → localStorage (one browser). Pass one to sync a backend.
-});
-```
-
-Nothing else to install — Preact is bundled in, and Poke renders into its own
-Shadow DOM, so it won't touch your app's React/Preact/styles.
-
-`init()` returns a handle: `{ store, identity, mount, unmount, destroy }`. Call
-`destroy()` on teardown (framework unmount, HMR).
-
-### Environments — keeping Poke out of production
-
-Poke is a review tool. It should not reach real users. Pass `enabled` so a
-misconfigured deploy fails safe:
-
-```js
-init({ enabled: process.env.NODE_ENV !== "production" });  // Node / Next
-init({ enabled: import.meta.env.DEV });                     // Vite
-init({ enabled: process.env.NEXT_PUBLIC_POKE === "on" });   // explicit flag
-init({ enabled: () => featureFlags.poke });                 // function, called at init
-```
-
-| `enabled` value | Result |
-|---|---|
-| omitted | **runs** (default) |
-| `true`, `"development"`, `"dev"`, `"staging"`, `"test"`, `"preview"`, `"local"` | runs |
-| `false`, `"production"`, or **anything else** | inert: no UI, no adapter, no network; `init()` still returns a valid no-op instance |
-
-When disabled, Poke also removes any overlay a previous enabled `init()` left on
-the page (e.g. after an env flag flips during HMR). Belt and braces: for the
-script-tag build, the surest way is to only render the `<script>` element
-server-side when you're not in production.
-
-### Framework setup
-
-Poke touches `window`/`document`, so it must run in the browser only. Runnable
-versions of each of these are in [`examples/frameworks/`](https://github.com/yusuf-ishaku/poke/tree/main/examples/frameworks).
-
-<details>
-<summary><b>Vanilla / plain HTML</b></summary>
-
-```html
-<script type="module">
-  import { init } from "https://unpkg.com/@appliftlabs/poke/dist/index.js";
-  init({ pageId: location.pathname });
-</script>
-```
-
-or the no-bundler script tag:
-
-```html
-<script
-  src="https://unpkg.com/@appliftlabs/poke/dist/poke.global.js"
-  data-poke-user-id="u_12"
-  data-poke-user-name="Ada Lovelace"
-></script>
-```
-</details>
-
-<details>
-<summary><b>React</b> (Vite, CRA, etc.)</summary>
-
-```tsx
-// Poke.tsx
-import { useEffect } from "react";
-import { useLocation } from "react-router-dom"; // or your router's equivalent
-
-export function Poke() {
-  const { pathname } = useLocation();
-
-  useEffect(() => {
-    let poke: { destroy(): void } | undefined;
-    let cancelled = false;
-    import("@appliftlabs/poke").then(({ init, HttpAdapter }) => {
-      if (cancelled) return;
-      poke = init({
-        pageId: pathname,
-        adapter: new HttpAdapter({ baseUrl: import.meta.env.VITE_POKE_URL }),
-      });
-    });
-    return () => { cancelled = true; poke?.destroy(); };
-  }, [pathname]); // re-init on route change so comments scope per page
-  return null;
-}
-```
-
-Render `<Poke />` once, near the root (in `App`). No router? Pass a stable
-`pageId` string yourself, or drop the dep and use `window.location.pathname`
-for a single-page app.
-</details>
-
-<details>
-<summary><b>Next.js</b></summary>
-
-**App Router** — `app/layout.tsx` is a Server Component, so use a client child.
-Key detail: re-run on route change so comments scope per page.
-
-```tsx
-// app/poke.tsx
-"use client";
-import { useEffect } from "react";
-import { usePathname } from "next/navigation";
-
-export function Poke() {
-  const pathname = usePathname();
-
-  useEffect(() => {
-    let poke: { destroy(): void } | undefined;
-    let cancelled = false;
-
-    import("@appliftlabs/poke").then(({ init, HttpAdapter }) => {
-      if (cancelled) return;
-      poke = init({
-        pageId: pathname, // NOT window.location.pathname — that won't update
-        adapter: new HttpAdapter({ baseUrl: process.env.NEXT_PUBLIC_POKE_URL! }),
-      });
-    });
-
-    return () => {
-      cancelled = true;
-      poke?.destroy();
-    };
-  }, [pathname]); // re-init when the route changes
-
-  return null;
-}
-```
-
-```tsx
-// app/layout.tsx
-import { Poke } from "./poke";
-export default function RootLayout({ children }) {
-  return (
-    <html><body>{children}<Poke /></body></html>
-  );
-}
-```
-
-**Pages Router** — same idea in `pages/_app.tsx`, keyed on `router.pathname`:
-
-```tsx
-import { useEffect } from "react";
-import { useRouter } from "next/router";
-
-// inside App({ Component, pageProps })
-const router = useRouter();
-useEffect(() => {
-  let poke: { destroy(): void } | undefined;
-  let cancelled = false;
-  import("@appliftlabs/poke").then(({ init, HttpAdapter }) => {
-    if (cancelled) return;
-    poke = init({
-      pageId: router.pathname,
-      adapter: new HttpAdapter({ baseUrl: process.env.NEXT_PUBLIC_POKE_URL! }),
-    });
-  });
-  return () => { cancelled = true; poke?.destroy(); };
-}, [router.pathname]);
-```
-
-The dynamic `import()` inside `useEffect` keeps Poke out of the server bundle;
-the `cancelled` guard stops a stale instance mounting if you navigate again
-before the import resolves.
-
-> **`window.location.pathname` with `[]` deps is the #1 mistake** — it captures
-> the first route and never updates, so every page shows the same comments. Use
-> the reactive `usePathname()` / `router.pathname` and depend on it.
-</details>
-
-<details>
-<summary><b>Vue 3</b></summary>
-
-```ts
-// main.ts, after createApp(...).mount(...)
-import("@appliftlabs/poke").then(({ init, HttpAdapter }) => {
-  init({
-    pageId: window.location.pathname,
-    adapter: new HttpAdapter({ baseUrl: import.meta.env.VITE_POKE_URL }),
-  });
-});
-```
-
-or as a component with `onMounted` / `onUnmounted` calling `init()` / `destroy()`.
-</details>
-
-<details>
-<summary><b>Svelte / SvelteKit</b></summary>
-
-```svelte
-<!-- +layout.svelte -->
-<script>
-  import { onMount } from "svelte";
-  onMount(() => {
-    let poke;
-    import("@appliftlabs/poke").then(({ init, HttpAdapter }) => {
-      poke = init({
-        pageId: location.pathname,
-        adapter: new HttpAdapter({ baseUrl: import.meta.env.VITE_POKE_URL }),
-      });
-    });
-    return () => poke?.destroy();
-  });
-</script>
-```
-</details>
-
-**Why the effect re-runs on route change:** `pageId` is fixed for the life of an
-`init()` call — Poke doesn't watch the URL itself. Each snippet above keys its
-effect on the router's current path, so navigating tears down the old instance
-and re-inits with the new `pageId`. That's what scopes comments per page. If you
-want one shared comment set across several routes, pass a constant `pageId`
-instead.
-
-**The sidebar spans the whole app.** Pins are per-page, but the "☰ All" sidebar
-lists every comment across every route (when your backend supports it — the
-bundled server and adapters do). Selecting a comment from another route calls
-`onNavigate(pageId)` so your router can go there:
-
-```js
-init({
-  adapter: ...,
-  onNavigate: (pageId) => router.push(pageId), // Next: useRouter().push
-});
-```
-
-Without `onNavigate`, Poke does `location.assign(pageId)` — works if `pageId`
-is a real path, but it's a full reload.
-
-### Identity
-
-| You pass | Author of comments | Name prompt |
-|---|---|---|
-| `user: { id, name }` | that user | never |
-| `user: { name: "Sam" }` | browser-local id, name pre-filled to "Sam" | never |
-| nothing | browser-local id | on first comment; then remembered |
-
-When Poke manages identity, `init()` returns an `identity` handle
-(`identity.name`, `identity.isNamed`, `identity.setName(...)`) if you'd rather
-drive the name yourself. The name and a stable anonymous id live in
-`localStorage` under `poke:identity`. This is not authentication — anyone can
-type any name — but it's the right weight for "a client opens a link and leaves
-feedback".
-
-Or the script tag, no build step at all:
-
-```html
-<script
-  src="https://unpkg.com/@appliftlabs/poke/dist/poke.global.js"
-  data-poke-user-id="u_12"
-  data-poke-user-name="Ada Lovelace"
-></script>
-```
-
-### Going multi-user
-
-**1. Run the backend — pick one:**
-
-**Option A: inside your own app (recommended for Node/Next.js apps).** No
-separate deploy, no second database — Poke's API is a route your app already
-serves, sharing your Postgres and your auth. This is the `@appliftlabs/poke/server`
-export, structured the way [better-auth](https://better-auth.com) does its
-handler: one config call, mounted with a framework-specific one-liner.
+The fastest path to real, multi-user comments is running Poke's API as a route
+inside the backend you already have — no separate service, no second
+database.
 
 ```ts
 // app/api/poke/[...poke]/route.ts  (Next.js App Router)
@@ -346,12 +24,9 @@ import { toNextJsHandler } from "@appliftlabs/poke/next-js";
 import { Pool } from "pg";
 
 const poke = createPoke({
-  database: new Pool({ connectionString: process.env.DATABASE_URL }),
-  // Derive the author from your own session — the right way to do auth here.
-  // Omit `getUser` (or set `allowAnonymous: true`) to trust the client's own
-  // identity instead, for a trusted/internal audience.
+  database: new Pool({ connectionString: process.env.DATABASE_URL }), // your existing pool
   getUser: async () => {
-    const session = await auth();
+    const session = await auth(); // your existing auth
     return session && { id: session.user.id, name: session.user.name };
   },
 });
@@ -359,7 +34,35 @@ const poke = createPoke({
 export const { GET, POST, PATCH, DELETE } = toNextJsHandler(poke.handler);
 ```
 
-Plain Node / Express — same `createPoke()`, a different one-liner to mount it:
+```tsx
+// app/poke.tsx — the client half, mounted once near your app root
+"use client";
+import { useEffect } from "react";
+import { usePathname } from "next/navigation";
+
+export function Poke() {
+  const pathname = usePathname();
+  useEffect(() => {
+    let instance: { destroy(): void } | undefined;
+    import("@appliftlabs/poke").then(({ init, HttpAdapter }) => {
+      instance = init({
+        enabled: process.env.NODE_ENV !== "production", // never ships to real users
+        pageId: pathname,
+        adapter: new HttpAdapter({ baseUrl: "/api/poke" }),
+      });
+    });
+    return () => instance?.destroy();
+  }, [pathname]);
+  return null;
+}
+```
+
+That's a whole team commenting live on your app, stored in Postgres you
+already run. `createPoke` needs `pg` (`npm i pg`) — a peer dependency, not
+bundled, so it uses your own driver. The schema creates itself on first
+request.
+
+**Not Next.js?** Same `createPoke()`, a different one-line mount:
 
 ```ts
 import { createServer } from "node:http";
@@ -367,88 +70,152 @@ import { createPoke } from "@appliftlabs/poke/server";
 import { toNodeHandler } from "@appliftlabs/poke/node";
 import { Pool } from "pg";
 
-const poke = createPoke({ database: new Pool({ connectionString: process.env.DATABASE_URL }) });
+const poke = createPoke({
+  database: new Pool({ connectionString: process.env.DATABASE_URL }),
+});
 createServer(toNodeHandler(poke.handler)).listen(4000);
 ```
 
-`createPoke` needs `pg` (`npm i pg`) — it's a peer dependency, not bundled, so
-your app brings its own driver, same as `betterAuth({ database: pool })`. The
-schema (`poke_threads` / `poke_messages`) is created automatically on first
-request; no separate migration step.
+**Not Node at all, or want it fully isolated from your app?** See
+[Standalone server](#standalone-server-non-nodejs-backends) below.
 
-<details>
-<summary><b>Realtime & deployment</b> — SSE, serverless, and what "works everywhere" actually means</summary>
+**Other frameworks** (React, Vue, Svelte, plain HTML) — the client-side half
+above is nearly identical everywhere; see
+[`examples/frameworks/`](https://github.com/yusuf-ishaku/poke/tree/main/examples/frameworks)
+for a complete file per stack.
 
-The live-update stream is genuinely in-process: a write in one server instance
-notifies subscribers connected to *that same instance*. That's exactly right
-for a long-lived Node process (one instance, every request). On serverless/edge
-platforms that spin up many short-lived instances, two viewers hitting
-different instances won't see each other's comments appear live over SSE —
-though every read still goes to the same database, so the truth is never wrong,
-just not always pushed instantly. Set `realtime: false` to skip the SSE route
-entirely on a platform where long connections don't work, and viewers will pick
-up changes on their next navigation/refresh instead.
+## Or skip the backend entirely
 
-</details>
+No `adapter`, no server, nothing to deploy — comments save to `localStorage`
+in that one browser. Good for a solo pass over your own app before you wire up
+the real thing.
 
-**Option B: a standalone deploy**, for non-Node backends or when you'd rather
-keep it isolated from your app entirely. Deploy your own copy of
-[`server/`](https://github.com/yusuf-ishaku/poke/tree/main/server) — full
-instructions (Railway, Fly, Docker, plain Node) are in
-[`server/README.md`](https://github.com/yusuf-ishaku/poke/blob/main/server/README.md). Locally it's:
-
-```bash
-cd server && npm install
-docker compose up -d                    # or bring your own Postgres
-DATABASE_URL=postgres://poke:poke@localhost:5432/poke npm run migrate
-node --env-file=.env src/server.js       # http://localhost:4000
-```
-
-**2. Point the client at it** with `HttpAdapter` — same for either option
-above, just change `baseUrl`:
-
-```ts
-import { init, HttpAdapter } from "@appliftlabs/poke";
+```js
+import { init } from "@appliftlabs/poke";
 
 init({
-  user: { id: me.id, name: me.name },     // or omit for the name prompt
-  adapter: new HttpAdapter({
-    baseUrl: "/api/poke",                 // Option A: mounted in your own app
-    // baseUrl: "https://your-poke-server.example.com",  // Option B: standalone
-    headers: () => ({ Authorization: `Bearer ${getToken()}` }), // if your server checks auth
-    // realtime is automatic — the adapter subscribes to the SSE stream at
-    // {baseUrl}/pages/:pageId/events. Pass `sseUrl: null` to disable.
-  }),
+  enabled: process.env.NODE_ENV !== "production",
+  user: { id: currentUser.id, name: currentUser.name }, // or omit for a name prompt
 });
 ```
 
-That's it — pins now sync live for everyone on the page.
+Preact is bundled in and Poke renders into its own Shadow DOM, so this is the
+entire install — nothing else to add, nothing of yours it can collide with.
+
+`init()` returns `{ store, identity, mount, unmount, destroy }`. Call
+`destroy()` on teardown.
+
+## How it works
+
+**The client** (`@appliftlabs/poke`) is the part that runs in the browser: a
+comment-mode toggle, click-to-pin, threaded replies, resolve/reopen, and a
+sidebar listing every comment across your whole app. It always runs, whether
+or not you've set up a backend.
+
+**A backend** is only needed once two people need to see each other's
+comments — the browser can't safely talk to a database on its own. Three ways
+to get one, in order of how little you have to do:
+
+1. **`createPoke()` inside your app** (above) — the default recommendation.
+2. **[Standalone server](#standalone-server-non-nodejs-backends)** — a small
+   Postgres-backed server you deploy separately.
+3. **Your own `StorageAdapter`** — implement six methods against Supabase,
+   Firebase, or an API you already have. See
+   [Writing a custom adapter](#writing-a-custom-adapter).
+
+## Keeping Poke out of production
+
+Poke is a review tool — it shouldn't reach real users. Gate it with `enabled`:
+
+```js
+init({ enabled: process.env.NODE_ENV !== "production" }); // Node / Next
+init({ enabled: import.meta.env.DEV });                    // Vite
+```
+
+Anything other than `true` or a dev-ish string (`"development"`, `"staging"`,
+`"test"`, `"preview"`, `"local"`) makes `init()` a complete no-op — no UI, no
+network — and it still returns a valid instance so your code doesn't need a
+guard around it.
+
+## Identity
+
+| You pass | Author of comments | Name prompt |
+|---|---|---|
+| `user: { id, name }` | that user | never |
+| `user: { name: "Sam" }` | a stable per-browser id, name pre-filled | never |
+| nothing | a stable per-browser id | on first comment, then remembered |
+
+Not authentication — anyone can type any name — but the right weight for "a
+client opens a link and leaves feedback." `init()` returns an `identity`
+handle (`identity.name`, `identity.setName(...)`) if you want to drive it
+yourself.
+
+## `createPoke` reference
+
+```ts
+createPoke({
+  database,        // required: a pg.Pool, or anything shaped like one
+  getUser,         // (req) => PokeUser | null — derive the author from your session
+  allowAnonymous,  // trust the client's own author instead of getUser. default false
+  project,         // namespace comments when one DB serves multiple apps. default "default"
+  origins,         // CORS allowlist: "*", an exact origin, or "https://*.example.com". default "*"
+  realtime,        // SSE live updates. default true — see note below
+})
+```
 
 <details>
-<summary>The REST contract — implemented by both <code>@appliftlabs/poke/server</code> and <code>server/</code> (for a custom backend)</summary>
+<summary>Realtime on serverless/edge platforms</summary>
 
+The live-update stream is in-process: a write on one server instance notifies
+subscribers connected to *that instance*. Exactly right for a single
+long-lived Node process. On serverless/edge platforms that run many
+short-lived instances, two people on different instances won't see each
+other's comments appear live — reads are always correct, just not always
+pushed instantly. Set `realtime: false` to skip the SSE route where long
+connections don't work; viewers pick up changes on their next navigation.
+
+</details>
+
+## Standalone server (non-Node.js backends)
+
+A ~350-line Postgres-backed server you deploy on its own — for a non-Node
+backend, or when you'd rather keep Poke fully separate from your app. Full
+instructions (Railway, Fly, Docker) are in
+[`server/README.md`](https://github.com/yusuf-ishaku/poke/blob/main/server/README.md).
+
+```bash
+cd server && npm install
+docker compose up -d                              # or bring your own Postgres
+DATABASE_URL=postgres://poke:poke@localhost:5432/poke npm run migrate
+node --env-file=.env src/server.js                 # http://localhost:4000
+```
+
+Point the client at it the same way, just with a full URL:
+
+```js
+adapter: new HttpAdapter({ baseUrl: "https://your-poke-server.example.com" })
+```
+
+<details>
+<summary>The REST contract (for either backend, or a custom one)</summary>
 
 | Method | Path | Body | Returns |
 |---|---|---|---|
 | `GET` | `/pages/:pageId/threads` | — | `PokeThread[]` (one page) |
-| `GET` | `/threads` | — | `PokeThread[]` (all pages — powers the sidebar) |
+| `GET` | `/threads` | — | `PokeThread[]` (whole app — the sidebar) |
 | `POST` | `/threads` | `PokeThread` | `201` |
 | `POST` | `/threads/:id/messages` | `{ body, author }` | `PokeMessage` |
 | `PATCH` | `/threads/:id` | `{ status }` | `200` |
 | `PATCH` | `/messages/:id` | `{ body }` | `200` |
 | `DELETE` | `/threads/:id` | — | `204` |
-| `GET` | `/pages/:pageId/events` | — | SSE stream (optional) |
-| `GET` | `/pages/*/events` | — | SSE stream for *any* page (sidebar realtime) |
-
-`GET /threads` and the `*` event channel are optional — an adapter that omits
-`listAllThreads` just shows the current page in the sidebar.
+| `GET` | `/pages/:pageId/events` | — | SSE stream (`:pageId` may be `*` for every page) |
 
 </details>
 
-### Writing a custom adapter (Supabase, Firebase, your own API)
+## Writing a custom adapter
 
-Instead of running `server/`, implement `StorageAdapter` — the six methods (all
-may be async) plus an optional `subscribe()` for realtime:
+Implement `StorageAdapter` against Supabase, Firebase, or your own API — six
+methods (all may be async) plus an optional `subscribe()` for realtime:
 
 ```ts
 import type { StorageAdapter } from "@appliftlabs/poke";
@@ -469,63 +236,44 @@ class FirebaseAdapter implements StorageAdapter {
 ## The hard part: element anchoring
 
 A naive version of this stores `{ x: 320, y: 78 }` and draws a pin there. That
-breaks the moment the page reflows, the viewport changes, or content above it
-grows. Poke instead remembers *which element* a comment belongs to.
+breaks the moment the page reflows or the viewport changes. Poke instead
+remembers *which element* a comment belongs to.
 
-When you drop a pin, Poke captures an **`ElementAnchor`** — a redundant
-description of the target element:
-
-- a CSS selector path, built to prefer stable hooks (`id`, `data-testid`, stable
-  class names) over hashed/generated ones
-- a structural path (`body > main > section > ul > li:3`) that survives class and
-  attribute churn
-- identifying attributes (`data-testid`, `aria-label`, `href`, `role`, …)
-- the element's trimmed text content
-- where *within* the element you clicked, as 0–1 fractions, so the pin sits on
-  the corner of the image you actually pointed at
-- absolute coordinates, as a last-resort fallback
-
-On the next page load, `resolveAnchor()` gathers candidate elements from several
-independent lookups and **scores each one** against all the stored evidence. The
-best-supported candidate wins, provided it clears a confidence floor. Any single
-strategy can go stale — a class rename, a regenerated `id`, a new wrapper `div` —
-and the pin still lands, because the others corroborate.
+When you drop a pin, Poke captures an `ElementAnchor` — a redundant
+description of the target: a CSS selector that prefers stable hooks (`id`,
+`data-testid`) over hashed/generated ones, a structural path
+(`body > main > ul > li:3`) that survives class churn, identifying attributes,
+trimmed text content, and where *within* the element you clicked. On the next
+load, `resolveAnchor()` scores candidate elements against all of that evidence
+at once — any single signal can go stale and the pin still lands, because the
+others corroborate.
 
 ```ts
 import { captureAnchor, resolveAnchor, anchorPoint } from "@appliftlabs/poke";
 
-// When the user clicks to leave a comment:
 const anchor = captureAnchor(clickedElement, { clientX, clientY });
-save(comment, anchor); // anchor is plain JSON
+saveToYourStore(comment, anchor); // anchor is plain JSON
 
-// On the next page load, for each stored comment:
+// later, on any page load:
 const { element, confidence } = resolveAnchor(anchor);
 if (element) {
-  const { x, y } = anchorPoint(element, anchor); // absolute doc coords for the pin
-  drawPin(x, y, comment);
-} else {
-  // confidence === "lost" — show it in an "unanchored comments" tray instead
+  const { x, y } = anchorPoint(element, anchor);
+  drawPinAt(x, y); // confidence: "exact" | "high" | "medium" | "low" | "lost"
 }
 ```
-
-`confidence` is one of `exact | high | medium | low | lost`, so the UI can flag
-pins that landed on a shaky match.
 
 ## Development
 
 ```bash
 npm install
-npm test          # vitest, jsdom
+npm test           # vitest — jsdom for the client, real Postgres for src/server (opt-in)
 npm run typecheck
-npm run build     # dist/ — ESM, CJS, and a script-tag IIFE bundle
-
-# Try it: build, then serve and open examples/demo.html
-npx serve .
+npm run build       # dist/ — ESM, CJS, a script-tag IIFE, and the /server, /next-js, /node entries
 ```
 
 `examples/demo.html` is the full comment layer on a sample page.
-`examples/anchor-playground.html` is a focused "shuffle the DOM and re-anchor"
-harness for the engine alone.
+`examples/anchor-playground.html` shuffles the DOM live to show re-anchoring.
+`examples/frameworks/` has one runnable file per framework.
 
 ## License
 

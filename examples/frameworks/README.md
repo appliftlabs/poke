@@ -1,8 +1,9 @@
 # Framework setup examples
 
-Minimal, copy-pasteable integrations. Each assumes you've deployed the backend
-(see [`../../server/`](../../server/)) and have its URL; drop the `adapter` line
-to run against `localStorage` instead (single browser, no server).
+Minimal, copy-pasteable integrations. Each expects a backend URL to pass as
+`baseUrl` — either your own app's route (`createPoke()`, see the
+[main README](../../README.md)) or a [standalone server](../../server/) — and
+drops straight in as `localStorage`-only if you remove the `adapter` line.
 
 | File | Stack |
 |---|---|
