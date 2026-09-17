@@ -81,7 +81,7 @@ createServer(toNodeHandler(poke.handler)).listen(4000);
 
 **Other frameworks** (React, Vue, Svelte, plain HTML) — the client-side half
 above is nearly identical everywhere; see
-[`examples/frameworks/`](https://github.com/yusuf-ishaku/poke/tree/main/examples/frameworks)
+[`examples/frameworks/`](https://github.com/appliftlabs/poke/tree/main/examples/frameworks)
 for a complete file per stack.
 
 ## Or skip the backend entirely
@@ -181,7 +181,7 @@ connections don't work; viewers pick up changes on their next navigation.
 A ~350-line Postgres-backed server you deploy on its own — for a non-Node
 backend, or when you'd rather keep Poke fully separate from your app. Full
 instructions (Railway, Fly, Docker) are in
-[`server/README.md`](https://github.com/yusuf-ishaku/poke/blob/main/server/README.md).
+[`server/README.md`](https://github.com/appliftlabs/poke/blob/main/server/README.md).
 
 ```bash
 cd server && npm install

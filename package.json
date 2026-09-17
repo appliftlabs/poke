@@ -4,13 +4,13 @@
   "description": "Figma-style pinned comments for any live web page. Drop-in, element-anchored, open source.",
   "license": "MIT",
   "author": "Applift Labs",
-  "homepage": "https://github.com/yusuf-ishaku/poke#readme",
+  "homepage": "https://github.com/appliftlabs/poke#readme",
   "repository": {
     "type": "git",
-    "url": "git+https://github.com/yusuf-ishaku/poke.git"
+    "url": "git+https://github.com/appliftlabs/poke.git"
   },
   "bugs": {
-    "url": "https://github.com/yusuf-ishaku/poke/issues"
+    "url": "https://github.com/appliftlabs/poke/issues"
   },
   "keywords": [
     "comments",
