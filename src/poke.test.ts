@@ -77,6 +77,53 @@ describe("init", () => {
     await poke.destroy();
   });
 
+  it("doesn't show the draft composer and the name prompt at once", async () => {
+    // Regression test: submitting a comment while unnamed used to leave the
+    // "New comment" composer rendered underneath the name prompt (the draft
+    // state was never cleared when the name gate took over), showing two
+    // stacked dialogs at once.
+    const poke = init({ pageId: "p1" }); // no `user` -> unnamed local identity
+    await poke.store.start();
+    poke.mount();
+
+    const shadow = document.getElementById("poke-overlay-host")!.shadowRoot!;
+    const toolbar = shadow.querySelector<HTMLElement>(".poke-toolbar")!;
+    const commentToggle = toolbar.querySelector("button")!;
+    commentToggle.click(); // enter comment mode
+    await new Promise((r) => setTimeout(r, 20)); // flush the mode-change effect
+
+    const target = document.querySelector<HTMLElement>("button[data-testid='cta']")!;
+    target.dispatchEvent(
+      new MouseEvent("click", {
+        bubbles: true,
+        cancelable: true,
+        clientX: 5,
+        clientY: 5,
+      }),
+    );
+    await new Promise((r) => setTimeout(r, 20));
+
+    const textarea = shadow.querySelector<HTMLTextAreaElement>(".poke-card textarea");
+    expect(textarea).not.toBeNull();
+    textarea!.value = "This needs a fix";
+    textarea!.dispatchEvent(new Event("input", { bubbles: true }));
+    await new Promise((r) => setTimeout(r, 20));
+
+    const submit = [...shadow.querySelectorAll("button")].find(
+      (b) => b.textContent === "Comment",
+    )!;
+    submit.click();
+    await new Promise((r) => setTimeout(r, 20));
+
+    // Exactly one poke-card should be visible: the name prompt, not the draft
+    // composer stacked underneath it.
+    const cards = shadow.querySelectorAll(".poke-card");
+    expect(cards.length).toBe(1);
+    expect(cards[0]!.textContent).toContain("Add your name");
+
+    await poke.destroy();
+  });
+
   describe("enabled gate", () => {
     it("runs by default (enabled omitted)", async () => {
       const poke = init({ user: { id: "u1", name: "Ada" }, pageId: "p1" });

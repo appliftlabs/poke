@@ -224,8 +224,11 @@ export function Overlay({
         );
       })}
 
-      {/* draft composer */}
+      {/* draft composer — hidden once the name gate takes over: its content is
+          already captured in the pending action's closure, and showing both at
+          once looks like two stacked dialogs. */}
       {draft &&
+        !pendingAction &&
         (() => {
           const pos = clampToViewport(draft.point.x + 12, draft.point.y + 12, 320, 200);
           return (
